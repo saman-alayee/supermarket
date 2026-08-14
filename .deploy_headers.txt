@@ -1,0 +1,12 @@
+HTTP/1.1 307 Moved
+Connection: close
+Content-length: 167
+Location: /cpsess3492686722/frontend/jupiter/index.html?login=1&post_login=97309251277169
+Set-Cookie: cprelogin=no; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: cpsession=kiaakala%3aUXNVImiOtUrqZjtr%2ccb44c75098215b2c6f98d7e0d2f1d7cf; HttpOnly; path=/; port=2083; secure
+Set-Cookie: roundcube_sessid=expired; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: roundcube_sessauth=expired; HttpOnly; domain=cip17.mizbanfadns.net; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: PPA_ID=expired; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Content-type: text/html; charset="utf-8"
+Cache-Control: no-cache, no-store, must-revalidate, private
+

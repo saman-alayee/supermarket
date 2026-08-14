@@ -1,0 +1,21 @@
+HTTP/1.1 307 Moved
+Connection: close
+Content-length: 167
+Location: /cpsess0001318097/frontend/jupiter/index.html?login=1&post_login=25456553134479
+Set-Cookie: cprelogin=no; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: cpsession=kiaakala%3aNLGZh_1DAAGyYGQs%2c08dc499b577c88f26f3b250b2f2bdd9f; HttpOnly; path=/; port=2083; secure
+Set-Cookie: roundcube_sessid=expired; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: roundcube_sessauth=expired; HttpOnly; domain=cip17.mizbanfadns.net; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Set-Cookie: PPA_ID=expired; HttpOnly; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; port=2083; secure
+Content-type: text/html; charset="utf-8"
+Cache-Control: no-cache, no-store, must-revalidate, private
+
+HTTP/1.1 200 OK
+Content-Type: text/html; charset="utf-8"
+Date: Fri, 14 Aug 2026 11:01:32 GMT
+Cache-Control: no-cache, no-store, must-revalidate, private
+Pragma: no-cache
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Content-Length: 241265
+

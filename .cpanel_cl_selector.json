@@ -1,0 +1,7 @@
+{
+  "message":[
+                 "Cannot get extensions list for version \"\". Please, make sure that native php works fine and run \"cloudlinux-selector setup --interpreter=php --json\" to configure PHP selector."
+               ],
+  "data":[],
+  "status":"ERROR"
+}
