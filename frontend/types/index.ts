@@ -12,7 +12,32 @@ export interface Category {
   sortOrder: number;
   isActive: boolean;
   _count?: { products: number };
+  tags?: Tag[];
 }
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  categoryId: string;
+  icon: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  category?: { id: string; name: string; slug: string };
+  _count?: { products: number };
+}
+
+export interface Slider {
+  id: string;
+  title: string | null;
+  image: string;
+  linkUrl: string | null;
+  sortOrder: number;
+  placement: SliderPlacement;
+  isActive: boolean;
+}
+
+export type SliderPlacement = 'HOME_TOP' | 'HOME_MID';
 
 export interface Product {
   id: string;
@@ -31,7 +56,9 @@ export interface Product {
   isFeatured: boolean;
   isNew: boolean;
   categoryId: string;
+  tagId?: string | null;
   category?: { id: string; name: string; slug: string };
+  tag?: Tag | null;
   inStock: boolean;
 }
 
@@ -65,6 +92,14 @@ export interface User {
   lastName: string | null;
   role: 'CUSTOMER' | 'ADMIN';
   isActive?: boolean;
+  customerGroupId?: string | null;
+  customerGroup?: CustomerGroup | null;
+}
+
+export interface CustomerGroup {
+  id: string;
+  name: string;
+  description: string | null;
 }
 
 export interface Coupon {
@@ -102,6 +137,13 @@ export interface AppNotification {
   createdAt: string;
 }
 
+export type PaymentMethod =
+  | 'CASH_AT_DOOR'
+  | 'RETIREMENT_FUND'
+  | 'SOCIAL_SECURITY'
+  | 'TARA'
+  | 'OTHER_WALLET';
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -110,6 +152,8 @@ export interface Order {
   couponCode?: string | null;
   totalPrice: number;
   status: OrderStatus;
+  paymentMethod?: PaymentMethod;
+  paymentDetails?: Record<string, string> | null;
   customerName: string;
   customerPhone?: string;
   deliveryAddress?: string;
@@ -141,7 +185,13 @@ export interface OrderItem {
   product?: { image: string | null; slug: string };
 }
 
-export type OrderStatus = 'NEW' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type OrderStatus =
+  | 'NEW'
+  | 'REVIEWING'
+  | 'PREPARING'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED';
 
 export interface Address {
   id: string;
@@ -167,8 +217,34 @@ export interface HomeSections {
   newProducts: Product[];
 }
 
+export interface HomeCategorySection {
+  category: Category;
+  products: Product[];
+}
+
+export interface SalesStats {
+  daily: { label: string; revenue: number; orders: number }[];
+  byPaymentMethod: { method: PaymentMethod; count: number; revenue: number }[];
+  totals: { revenue: number; orders: number; customers: number };
+}
+
+export interface AdminCustomer extends User {
+  createdAt: string;
+  _count: { orders: number };
+  orders?: Order[];
+}
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH_AT_DOOR: 'پرداخت در محل',
+  RETIREMENT_FUND: 'صندوق بازنشستگی',
+  SOCIAL_SECURITY: 'تامین اجتماعی',
+  TARA: 'کیف پول تارا',
+  OTHER_WALLET: 'سایر کیف پول‌ها',
+};
+
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   NEW: 'سفارش جدید',
+  REVIEWING: 'در حال بررسی',
   PREPARING: 'در حال آماده‌سازی',
   SHIPPED: 'ارسال شده',
   DELIVERED: 'تحویل داده شده',
@@ -177,6 +253,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   NEW: 'bg-blue-100 text-blue-700',
+  REVIEWING: 'bg-indigo-100 text-indigo-700',
   PREPARING: 'bg-yellow-100 text-yellow-700',
   SHIPPED: 'bg-purple-100 text-purple-700',
   DELIVERED: 'bg-green-100 text-green-700',

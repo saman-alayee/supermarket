@@ -1,3 +1,7 @@
 export default defineNuxtPlugin(() => {
-  // PWA install prompt handler - extensible for push notifications
+  if (!import.meta.client) return;
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+  });
 });

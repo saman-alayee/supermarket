@@ -1,14 +1,30 @@
+import type { PaymentMethod, Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import { AppError } from '../utils/errors';
 import { generateOrderNumber } from '../utils/helpers';
 import { cartService } from './cart.service';
 import { couponService } from './coupon.service';
 import { notificationService } from './notification.service';
+import { smsService } from './sms.service';
 
-export type OrderStatus = 'NEW' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type OrderStatus =
+  | 'NEW'
+  | 'REVIEWING'
+  | 'PREPARING'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+const INSTALLMENT_METHODS: PaymentMethod[] = [
+  'RETIREMENT_FUND',
+  'SOCIAL_SECURITY',
+  'TARA',
+  'OTHER_WALLET',
+];
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   NEW: ['PREPARING', 'CANCELLED'],
+  REVIEWING: ['NEW', 'PREPARING', 'CANCELLED'],
   PREPARING: ['SHIPPED', 'CANCELLED'],
   SHIPPED: ['DELIVERED', 'CANCELLED'],
   DELIVERED: [],
@@ -18,21 +34,44 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 interface CreateOrderInput {
   customerName: string;
   customerPhone: string;
-  deliveryAddress: string;
+  deliveryAddress?: string;
+  street?: string;
+  plaque?: string;
+  unit?: string;
   addressId?: string;
   addressTitle?: string;
   deliveryLatitude?: number;
   deliveryLongitude?: number;
   notes?: string;
   couponCode?: string;
+  paymentMethod: PaymentMethod;
+  paymentDetails?: Record<string, unknown>;
+}
+
+function buildDeliveryAddress(input: CreateOrderInput): string {
+  if (input.deliveryAddress?.trim()) {
+    return input.deliveryAddress.trim();
+  }
+
+  const parts = [input.street?.trim(), input.plaque ? `پلاک ${input.plaque}` : '', input.unit ? `واحد ${input.unit}` : '']
+    .filter(Boolean);
+
+  return parts.join('، ');
+}
+
+function validatePaymentDetails(
+  paymentMethod: PaymentMethod,
+  paymentDetails?: Record<string, unknown>
+) {
+  if (paymentMethod === 'CASH_AT_DOOR') return;
+
+  if (!paymentDetails || Object.keys(paymentDetails).length === 0) {
+    throw new AppError(400, 'جزئیات پرداخت برای این روش الزامی است');
+  }
 }
 
 export class OrderService {
-  async createOrder(
-    input: CreateOrderInput,
-    userId?: string,
-    sessionId?: string
-  ) {
+  async createOrder(input: CreateOrderInput, userId?: string, sessionId?: string) {
     const cart = await cartService.getCart(userId, sessionId);
 
     if (cart.items.length === 0) {
@@ -44,6 +83,8 @@ export class OrderService {
         throw new AppError(400, `موجودی ${item.name} کافی نیست`);
       }
     }
+
+    validatePaymentDetails(input.paymentMethod, input.paymentDetails);
 
     const subtotal = cart.totalPrice;
     let discountAmount = 0;
@@ -62,40 +103,50 @@ export class OrderService {
       couponCode = validation.code;
     }
 
-    if (!userId) {
-      throw new AppError(401, 'برای ثبت سفارش باید وارد حساب کاربری شوید');
+    let deliveryAddress = buildDeliveryAddress(input);
+    let addressId: string | null = input.addressId ?? null;
+    let addressTitle = input.addressTitle ?? null;
+    let deliveryLatitude = input.deliveryLatitude ?? null;
+    let deliveryLongitude = input.deliveryLongitude ?? null;
+
+    if (input.addressId && userId) {
+      const savedAddress = await prisma.address.findFirst({
+        where: { id: input.addressId, userId },
+      });
+      if (!savedAddress) {
+        throw new AppError(400, 'آدرس انتخاب‌شده معتبر نیست');
+      }
+
+      deliveryAddress = savedAddress.address;
+      addressId = savedAddress.id;
+      addressTitle = savedAddress.title;
+      deliveryLatitude = savedAddress.latitude;
+      deliveryLongitude = savedAddress.longitude;
+    } else if (!deliveryAddress) {
+      throw new AppError(400, 'آدرس ارسال الزامی است');
     }
 
-    if (!input.addressId) {
-      throw new AppError(400, 'برای ثبت سفارش باید یک آدرس ذخیره‌شده انتخاب کنید');
-    }
+    const initialStatus: OrderStatus = INSTALLMENT_METHODS.includes(input.paymentMethod)
+      ? 'REVIEWING'
+      : 'NEW';
 
     const orderNumber = generateOrderNumber();
-
-    const savedAddress = await prisma.address.findFirst({
-      where: { id: input.addressId, userId },
-    });
-    if (!savedAddress) {
-      throw new AppError(400, 'آدرس انتخاب‌شده معتبر نیست');
-    }
-
-    const deliveryAddress = savedAddress.address;
-    const addressId = savedAddress.id;
-    const addressTitle = savedAddress.title;
-    const deliveryLatitude = savedAddress.latitude;
-    const deliveryLongitude = savedAddress.longitude;
 
     const order = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
-          userId: userId || null,
+          userId: userId ?? null,
           subtotal,
           discountAmount,
           totalPrice,
-          couponCode: couponCode || null,
-          couponId: couponId || null,
-          status: 'NEW' as OrderStatus,
+          couponCode: couponCode ?? null,
+          couponId: couponId ?? null,
+          status: initialStatus,
+          paymentMethod: input.paymentMethod,
+          paymentDetails: input.paymentDetails
+            ? (input.paymentDetails as Prisma.InputJsonValue)
+            : undefined,
           customerName: input.customerName,
           customerPhone: input.customerPhone,
           deliveryAddress,
@@ -113,7 +164,13 @@ export class OrderService {
             })),
           },
           statusLogs: {
-            create: { status: 'NEW', note: 'سفارش ثبت شد' },
+            create: {
+              status: initialStatus,
+              note:
+                initialStatus === 'REVIEWING'
+                  ? 'سفارش در انتظار بررسی پرداخت'
+                  : 'سفارش ثبت شد',
+            },
           },
         },
         include: { items: true },
@@ -147,7 +204,7 @@ export class OrderService {
         userId,
         orderId: order.id,
         orderNumber: order.orderNumber,
-        status: 'NEW',
+        status: initialStatus,
       });
     }
 
@@ -159,6 +216,7 @@ export class OrderService {
       totalPrice: Number(order.totalPrice),
       couponCode: order.couponCode,
       status: order.status,
+      paymentMethod: order.paymentMethod,
       customerName: order.customerName,
       createdAt: order.createdAt,
     };
@@ -211,10 +269,17 @@ export class OrderService {
     return this.formatOrder(order);
   }
 
-  async getAllOrders(filters: { status?: OrderStatus; page?: number; limit?: number; search?: string }) {
-    const { status, page = 1, limit = 20, search } = filters;
+  async getAllOrders(filters: {
+    status?: OrderStatus;
+    paymentMethod?: PaymentMethod;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) {
+    const { status, paymentMethod, page = 1, limit = 20, search } = filters;
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
+    if (paymentMethod) where.paymentMethod = paymentMethod;
     if (search) {
       where.OR = [
         { orderNumber: { contains: search } },
@@ -250,10 +315,7 @@ export class OrderService {
 
     const allowed = ALLOWED_TRANSITIONS[current.status as OrderStatus];
     if (!allowed.includes(status)) {
-      throw new AppError(
-        400,
-        `تغییر وضعیت از ${current.status} به ${status} مجاز نیست`
-      );
+      throw new AppError(400, `تغییر وضعیت از ${current.status} به ${status} مجاز نیست`);
     }
 
     const order = await prisma.$transaction(async (tx) => {
@@ -281,6 +343,10 @@ export class OrderService {
 
     if (!order) throw new AppError(404, 'سفارش یافت نشد');
 
+    if (status === 'SHIPPED') {
+      await smsService.sendOrderShipped(order.customerPhone, order.orderNumber);
+    }
+
     await notificationService.notifyOrderStatusChange({
       userId: order.userId,
       orderId: order.id,
@@ -292,17 +358,27 @@ export class OrderService {
     return this.formatOrder(order);
   }
 
-  async getOrderStats() {
-    const [total, newOrders, preparing, shipped, delivered, cancelled] = await Promise.all([
-      prisma.order.count(),
-      prisma.order.count({ where: { status: 'NEW' } }),
-      prisma.order.count({ where: { status: 'PREPARING' } }),
-      prisma.order.count({ where: { status: 'SHIPPED' } }),
-      prisma.order.count({ where: { status: 'DELIVERED' } }),
-      prisma.order.count({ where: { status: 'CANCELLED' } }),
-    ]);
+  async sendOrderSms(orderId: string) {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new AppError(404, 'سفارش یافت نشد');
 
-    return { total, newOrders, preparing, shipped, delivered, cancelled };
+    await smsService.sendOrderShipped(order.customerPhone, order.orderNumber);
+    return { sent: true, orderNumber: order.orderNumber };
+  }
+
+  async getOrderStats() {
+    const [total, newOrders, reviewing, preparing, shipped, delivered, cancelled] =
+      await Promise.all([
+        prisma.order.count(),
+        prisma.order.count({ where: { status: 'NEW' } }),
+        prisma.order.count({ where: { status: 'REVIEWING' } }),
+        prisma.order.count({ where: { status: 'PREPARING' } }),
+        prisma.order.count({ where: { status: 'SHIPPED' } }),
+        prisma.order.count({ where: { status: 'DELIVERED' } }),
+        prisma.order.count({ where: { status: 'CANCELLED' } }),
+      ]);
+
+    return { total, newOrders, reviewing, preparing, shipped, delivered, cancelled };
   }
 
   private formatOrder(order: {
@@ -314,6 +390,8 @@ export class OrderService {
     couponCode?: string | null;
     totalPrice: { toNumber?: () => number } | number | bigint;
     status: OrderStatus;
+    paymentMethod?: PaymentMethod;
+    paymentDetails?: unknown;
     customerName: string;
     customerPhone: string;
     deliveryAddress: string;

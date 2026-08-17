@@ -19,18 +19,24 @@ import couponRoutes from './routes/coupon.routes';
 import contentRoutes from './routes/content.routes';
 import notificationRoutes from './routes/notification.routes';
 import geocodeRoutes from './routes/geocode.routes';
+import sliderRoutes from './routes/slider.routes';
+import tagRoutes from './routes/tag.routes';
+import favoriteRoutes from './routes/favorite.routes';
 
 const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+function isAllowedCorsOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (config.corsOrigins.includes(origin)) return true;
+  // Nuxt dev/preview may use ports 3000–3010, 8049, etc.
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || config.corsOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(null, false);
+      callback(null, isAllowedCorsOrigin(origin));
     },
     credentials: true,
   })
@@ -64,6 +70,9 @@ app.use('/api/geocode', geocodeRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/sliders', sliderRoutes);
+app.use('/api/tags', tagRoutes);
+app.use('/api/favorites', favoriteRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use(notFound);

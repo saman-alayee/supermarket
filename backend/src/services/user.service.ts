@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { AppError } from '../utils/errors';
 import { normalizePhone } from '../utils/normalize';
+import { smsService } from './sms.service';
 
 export class AddressService {
   async getUserAddresses(userId: string) {
@@ -75,15 +76,26 @@ export class AddressService {
 }
 
 export class CustomerService {
-  async getAll(page = 1, limit = 20, search?: string, role?: 'CUSTOMER' | 'ADMIN') {
+  async getAll(
+    page = 1,
+    limit = 20,
+    search?: string,
+    role?: 'CUSTOMER' | 'ADMIN',
+    paymentMethod?: string,
+    customerGroupId?: string
+  ) {
     const where: Record<string, unknown> = {};
     if (role) where.role = role;
+    if (customerGroupId) where.customerGroupId = customerGroupId;
     if (search) {
       where.OR = [
         { phone: { contains: search } },
         { firstName: { contains: search } },
         { lastName: { contains: search } },
       ];
+    }
+    if (paymentMethod) {
+      where.orders = { some: { paymentMethod } };
     }
 
     const [customers, total] = await Promise.all([
@@ -96,6 +108,8 @@ export class CustomerService {
           lastName: true,
           role: true,
           isActive: true,
+          customerGroupId: true,
+          customerGroup: { select: { id: true, name: true } },
           createdAt: true,
           _count: { select: { orders: true } },
         },
@@ -112,6 +126,81 @@ export class CustomerService {
     };
   }
 
+  async create(data: {
+    phone: string;
+    firstName?: string;
+    lastName?: string;
+    customerGroupId?: string;
+  }) {
+    const phone = normalizePhone(data.phone);
+
+    return prisma.user.create({
+      data: {
+        phone,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: 'CUSTOMER',
+        customerGroupId: data.customerGroupId,
+      },
+      select: {
+        id: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        customerGroupId: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async assignGroup(userId: string, customerGroupId: string | null) {
+    if (customerGroupId) {
+      const group = await prisma.customerGroup.findUnique({ where: { id: customerGroupId } });
+      if (!group) throw new AppError(404, 'گروه مشتری یافت نشد');
+    }
+
+    return prisma.user.update({
+      where: { id: userId },
+      data: { customerGroupId },
+      select: {
+        id: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+        customerGroupId: true,
+        customerGroup: { select: { id: true, name: true } },
+      },
+    });
+  }
+
+  async exportPhonesCsv(role: 'CUSTOMER' | 'ADMIN' = 'CUSTOMER') {
+    const users = await prisma.user.findMany({
+      where: { role, isActive: true },
+      select: { phone: true, firstName: true, lastName: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const header = 'phone,firstName,lastName';
+    const rows = users.map(
+      (u) =>
+        `${u.phone},"${(u.firstName ?? '').replace(/"/g, '""')}","${(u.lastName ?? '').replace(/"/g, '""')}"`
+    );
+
+    return [header, ...rows].join('\n');
+  }
+
+  async broadcastSms(message: string, role: 'CUSTOMER' | 'ADMIN' = 'CUSTOMER') {
+    const users = await prisma.user.findMany({
+      where: { role, isActive: true },
+      select: { phone: true },
+    });
+
+    const recipients = users.map((u) => u.phone);
+    return smsService.broadcast(recipients, message);
+  }
+
   async getById(id: string) {
     const customer = await prisma.user.findUnique({
       where: { id },
@@ -122,6 +211,8 @@ export class CustomerService {
         lastName: true,
         role: true,
         isActive: true,
+        customerGroupId: true,
+        customerGroup: { select: { id: true, name: true } },
         createdAt: true,
         addresses: true,
         orders: {
@@ -305,7 +396,30 @@ export class DiscountService {
   }
 }
 
+export class CustomerGroupService {
+  async getAll() {
+    return prisma.customerGroup.findMany({
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { users: true } } },
+    });
+  }
+
+  async create(data: { name: string; description?: string }) {
+    return prisma.customerGroup.create({ data });
+  }
+
+  async update(id: string, data: { name?: string; description?: string | null }) {
+    return prisma.customerGroup.update({ where: { id }, data });
+  }
+
+  async delete(id: string) {
+    await prisma.user.updateMany({ where: { customerGroupId: id }, data: { customerGroupId: null } });
+    await prisma.customerGroup.delete({ where: { id } });
+  }
+}
+
 export const addressService = new AddressService();
 export const customerService = new CustomerService();
+export const customerGroupService = new CustomerGroupService();
 export const adminUserService = new AdminUserService();
 export const discountService = new DiscountService();

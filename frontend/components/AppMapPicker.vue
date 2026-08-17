@@ -32,7 +32,9 @@ const locating = ref(false);
 const resolving = ref(false);
 const mapError = ref('');
 
-const DEFAULT_CENTER: L.LatLngExpression = [35.6892, 51.3890];
+const KIASAR_CENTER: L.LatLngExpression = [36.68, 50.45];
+const KIASAR_BOUNDS = L.latLngBounds([36.65, 50.4], [36.71, 50.5]);
+const DEFAULT_CENTER = KIASAR_CENTER;
 
 let map: L.Map | null = null;
 let marker: L.Marker | null = null;
@@ -144,6 +146,9 @@ function initMap() {
     scrollWheelZoom: !props.readonly,
     dragging: true,
     zoomControl: !props.readonly,
+    maxBounds: KIASAR_BOUNDS,
+    maxBoundsViscosity: 1.0,
+    minZoom: 13,
   });
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

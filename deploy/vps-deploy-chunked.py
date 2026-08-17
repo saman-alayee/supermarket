@@ -13,7 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def log(msg: str):
-    print(msg, flush=True)
+    text = str(msg)
+    try:
+        print(text, flush=True)
+    except UnicodeEncodeError:
+        print(text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), flush=True)
 
 
 def connect():
@@ -67,15 +71,22 @@ def put_file(c, local: Path, remote: str, retries=5):
 
 def main():
     frontend = ROOT / "frontend" / ".output" / "public"
+    backend_dist = ROOT / "backend" / "dist"
     if not frontend.exists():
         log("Missing frontend build — run npm run generate")
         sys.exit(1)
+    if not backend_dist.exists():
+        log("Missing backend build — run npm run build")
+        sys.exit(1)
 
     backend_files = [
-        (ROOT / "backend" / "dist" / "routes" / "address.routes.js", "/opt/kiaakala/api/dist/routes/address.routes.js"),
-        (ROOT / "backend" / "dist" / "services" / "user.service.js", "/opt/kiaakala/api/dist/services/user.service.js"),
         (ROOT / "backend" / "prisma" / "schema.prisma", "/opt/kiaakala/api/prisma/schema.prisma"),
+        (ROOT / "backend" / "prisma" / "seed.ts", "/opt/kiaakala/api/prisma/seed.ts"),
     ]
+    for path in sorted(backend_dist.rglob("*")):
+        if path.is_file():
+            rel = path.relative_to(backend_dist).as_posix()
+            backend_files.append((path, f"/opt/kiaakala/api/dist/{rel}"))
 
     files = sorted(p for p in frontend.rglob("*") if p.is_file())
     log(f"Deploying {len(files)} frontend files + {len(backend_files)} backend files")
@@ -98,7 +109,9 @@ def main():
             log(f"  progress {i}/{len(files)}")
 
     run(c, "chown -R www-data:www-data /var/www/kiaakala")
+    run(c, "cd /opt/kiaakala/api && npx prisma generate")
     run(c, "cd /opt/kiaakala/api && npx prisma db push --accept-data-loss")
+    run(c, "cd /opt/kiaakala/api && npx tsx prisma/seed.ts 2>&1 || echo SEED_SKIPPED")
     run(c, "pm2 restart kiaakala-api --update-env")
     run(c, "curl -sS http://127.0.0.1:3001/api/health")
     c.close()

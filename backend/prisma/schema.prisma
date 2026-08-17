@@ -15,10 +15,19 @@ enum UserRole {
 
 enum OrderStatus {
   NEW
+  REVIEWING
   PREPARING
   SHIPPED
   DELIVERED
   CANCELLED
+}
+
+enum PaymentMethod {
+  CASH_AT_DOOR
+  RETIREMENT_FUND
+  SOCIAL_SECURITY
+  TARA
+  OTHER_WALLET
 }
 
 enum CouponType {
@@ -31,23 +40,44 @@ enum NotificationType {
   GENERAL
 }
 
-model User {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  firstName String?
-  lastName  String?
-  role      UserRole @default(CUSTOMER)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum SliderPlacement {
+  HOME_TOP
+  HOME_MID
+}
 
+model User {
+  id              String   @id @default(cuid())
+  phone           String   @unique
+  firstName       String?
+  lastName        String?
+  role            UserRole @default(CUSTOMER)
+  isActive        Boolean  @default(true)
+  customerGroupId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customerGroup CustomerGroup? @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
   addresses     Address[]
   cart          Cart?
   orders        Order[]
   otpCodes      OtpCode[]
   notifications Notification[]
+  favorites     Favorite[]
 
+  @@index([customerGroupId])
   @@map("users")
+}
+
+model CustomerGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("customer_groups")
 }
 
 model OtpCode {
@@ -76,8 +106,27 @@ model Category {
   updatedAt DateTime @updatedAt
 
   products Product[]
+  tags     Tag[]
 
   @@map("categories")
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  categoryId String
+  name       String
+  slug       String
+  icon       String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, sortOrder])
+  @@map("tags")
 }
 
 model Product {
@@ -94,16 +143,20 @@ model Product {
   isFeatured    Boolean  @default(false)
   isNew         Boolean  @default(false)
   categoryId    String
+  tagId         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   category   Category       @relation(fields: [categoryId], references: [id])
+  tag        Tag?           @relation(fields: [tagId], references: [id], onDelete: SetNull)
   cartItems  CartItem[]
   orderItems OrderItem[]
   discounts  Discount[]
   images     ProductImage[]
+  favorites  Favorite[]
 
   @@index([categoryId])
+  @@index([tagId])
   @@index([isActive, isFeatured])
   @@index([isActive, isNew])
   @@map("products")
@@ -201,6 +254,35 @@ model OrderStatusLog {
   @@map("order_status_logs")
 }
 
+model Slider {
+  id        String          @id @default(cuid())
+  title     String
+  image     String
+  linkUrl   String?
+  sortOrder Int             @default(0)
+  placement SliderPlacement @default(HOME_TOP)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([placement, isActive, sortOrder])
+  @@map("sliders")
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("favorites")
+}
+
 model Cart {
   id        String   @id @default(cuid())
   userId    String?  @unique
@@ -230,25 +312,27 @@ model CartItem {
 }
 
 model Order {
-  id              String      @id @default(cuid())
-  orderNumber     String      @unique
-  userId          String?
-  subtotal        Int?
-  discountAmount  Int         @default(0)
-  totalPrice      Int
-  couponCode      String?
-  couponId        String?
-  status          OrderStatus @default(NEW)
-  customerName    String
-  customerPhone   String
-  deliveryAddress String
-  addressId       String?
-  addressTitle    String?
+  id                String        @id @default(cuid())
+  orderNumber       String        @unique
+  userId            String?
+  subtotal          Int?
+  discountAmount    Int           @default(0)
+  totalPrice        Int
+  couponCode        String?
+  couponId          String?
+  status            OrderStatus   @default(NEW)
+  paymentMethod     PaymentMethod @default(CASH_AT_DOOR)
+  paymentDetails    Json?
+  customerName      String
+  customerPhone     String
+  deliveryAddress   String
+  addressId         String?
+  addressTitle      String?
   deliveryLatitude  Float?
   deliveryLongitude Float?
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   user          User?              @relation(fields: [userId], references: [id])
   coupon        Coupon?            @relation(fields: [couponId], references: [id])
@@ -259,6 +343,7 @@ model Order {
   @@index([userId])
   @@index([status])
   @@index([customerPhone])
+  @@index([paymentMethod])
   @@map("orders")
 }
 

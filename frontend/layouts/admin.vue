@@ -6,8 +6,12 @@ const mobileNavOpen = ref(false);
 const navItems = [
   { to: '/admin', label: 'داشبورد', icon: 'lucide:layout-dashboard' },
   { to: '/admin/orders', label: 'سفارش‌ها', icon: 'lucide:package' },
+  { to: '/admin/sales', label: 'گزارش فروش', icon: 'lucide:bar-chart-3' },
   { to: '/admin/products', label: 'محصولات', icon: 'lucide:shopping-basket' },
   { to: '/admin/categories', label: 'دسته‌بندی', icon: 'lucide:layers' },
+  { to: '/admin/tags', label: 'برچسب‌ها', icon: 'lucide:tags' },
+  { to: '/admin/sliders', label: 'اسلایدرها', icon: 'lucide:images' },
+  { to: '/admin/customers', label: 'مشتریان', icon: 'lucide:user-round' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران', icon: 'lucide:users' },
   { to: '/admin/content', label: 'محتوا', icon: 'lucide:file-text' },

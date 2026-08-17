@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Product, Category, Pagination } from '~/types';
+import type { Product, Category, Tag } from '~/types';
 
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
@@ -8,6 +8,7 @@ const { formatPrice, resolveMediaUrl } = useFormat();
 
 const products = ref<Product[]>([]);
 const categories = ref<Category[]>([]);
+const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const showForm = ref(false);
 const editingId = ref<string | null>(null);
@@ -20,12 +21,23 @@ const form = reactive({
   stock: 0,
   unit: '',
   categoryId: '',
+  tagId: '' as string | null,
   image: null as string | null,
   images: [] as string[],
   isFeatured: false,
   isNew: false,
   isActive: true,
 });
+
+const tagOptions = computed(() =>
+  tags.value
+    .filter((tag) => !form.categoryId || tag.categoryId === form.categoryId)
+    .map((tag) => ({
+      value: tag.id,
+      label: tag.name,
+      icon: 'lucide:tag',
+    }))
+);
 
 const categoryOptions = computed(() =>
   categories.value.map((cat) => ({
@@ -40,12 +52,14 @@ onMounted(loadData);
 async function loadData() {
   loading.value = true;
   try {
-    const [prodRes, catRes] = await Promise.all([
+    const [prodRes, catRes, tagsRes] = await Promise.all([
       api.get<{ products: Product[] }>('/admin/products?limit=100'),
       api.get<Category[]>('/admin/categories'),
+      api.get<Tag[]>('/admin/tags').catch(() => ({ data: [] as Tag[] })),
     ]);
     products.value = prodRes.data.products;
     categories.value = catRes.data;
+    tags.value = tagsRes.data;
   } finally {
     loading.value = false;
   }
@@ -62,6 +76,7 @@ function openForm(product?: Product) {
       stock: product.stock,
       unit: product.unit || '',
       categoryId: product.categoryId,
+      tagId: product.tagId || '',
       image: product.image,
       images: product.images?.length ? [...product.images] : product.image ? [product.image] : [],
       isFeatured: product.isFeatured,
@@ -70,7 +85,7 @@ function openForm(product?: Product) {
     });
   } else {
     editingId.value = null;
-    Object.assign(form, { name: '', description: '', price: 0, discountPrice: null, stock: 0, unit: '', categoryId: categories.value[0]?.id || '', image: null, images: [], isFeatured: false, isNew: false, isActive: true });
+    Object.assign(form, { name: '', description: '', price: 0, discountPrice: null, stock: 0, unit: '', categoryId: categories.value[0]?.id || '', tagId: '', image: null, images: [], isFeatured: false, isNew: false, isActive: true });
   }
   showForm.value = true;
 }
@@ -78,6 +93,7 @@ function openForm(product?: Product) {
 async function save() {
   const payload = {
     ...form,
+    tagId: form.tagId || null,
     image: form.images[0] ?? form.image,
     images: form.images,
   };
@@ -182,6 +198,12 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             placeholder="دسته‌بندی را انتخاب کنید"
             searchable
             required
+          />
+          <AppSelect
+            v-model="form.tagId"
+            :options="tagOptions"
+            placeholder="برچسب (اختیاری)"
+            searchable
           />
           <div class="flex flex-wrap gap-2">
             <AppToggleChip v-model="form.isFeatured" label="ویژه" icon="lucide:sparkles" />

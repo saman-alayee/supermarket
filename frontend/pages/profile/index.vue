@@ -10,6 +10,13 @@ const loading = ref(true);
 
 const menuItems = [
   {
+    to: '/profile/favorites',
+    label: 'علاقه‌مندی‌ها',
+    desc: 'محصولات ذخیره‌شده',
+    icon: 'lucide:heart',
+    color: 'red',
+  },
+  {
     to: '/profile/orders',
     label: 'سفارش‌های من',
     desc: 'پیگیری وضعیت خریدها',
@@ -54,6 +61,7 @@ const colorMap: Record<string, string> = {
   orange: 'bg-orange-50 text-orange-600',
   green: 'bg-green-50 text-green-600',
   purple: 'bg-purple-50 text-purple-600',
+  red: 'bg-red-50 text-red-600',
 };
 
 onMounted(async () => {

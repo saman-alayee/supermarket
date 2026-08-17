@@ -91,6 +91,27 @@ export class SmsService {
     }
   }
 
+  /** Stub: notify customer when order is shipped. */
+  async sendOrderShipped(recipient: string, orderNumber: string): Promise<void> {
+    const formatted = this.formatRecipient(recipient);
+    if (!this.isConfigured()) {
+      console.log(`📱 [SMS stub] Order shipped: ${orderNumber} -> ${formatted}`);
+      return;
+    }
+    console.log(`📱 Order shipped SMS queued: ${orderNumber} -> ${formatted}`);
+  }
+
+  /** Stub: broadcast message to multiple recipients. */
+  async broadcast(recipients: string[], message: string): Promise<{ queued: number }> {
+    const formatted = recipients.map((r) => this.formatRecipient(r));
+    if (!this.isConfigured()) {
+      console.log(`📱 [SMS stub] Broadcast to ${formatted.length}: ${message.slice(0, 80)}`);
+      return { queued: formatted.length };
+    }
+    console.log(`📱 Broadcast SMS queued for ${formatted.length} recipients`);
+    return { queued: formatted.length };
+  }
+
   /** 09xxxxxxxxx — no +98 prefix per FarazSMS docs. */
   private formatRecipient(phone: string): string {
     const digits = phone.replace(/\D/g, '');

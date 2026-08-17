@@ -456,12 +456,92 @@ const demoCustomers = [
   { phone: '09123333333', firstName: 'رضا', lastName: 'کریمی' },
 ];
 
+const categoryTags: Record<string, { name: string; slug: string; icon?: string; sortOrder: number }[]> = {
+  labaniat: [
+    { name: 'شیر', slug: 'shir', sortOrder: 1 },
+    { name: 'ماست', slug: 'mast', sortOrder: 2 },
+    { name: 'پنیر', slug: 'panir', sortOrder: 3 },
+  ],
+  noshedani: [
+    { name: 'آب معدنی', slug: 'ab-madani', sortOrder: 1 },
+    { name: 'نوشابه', slug: 'nooshabe', sortOrder: 2 },
+    { name: 'آبمیوه', slug: 'abmive', sortOrder: 3 },
+  ],
+  tangholat: [
+    { name: 'چیپس', slug: 'chips', sortOrder: 1 },
+    { name: 'شکلات', slug: 'shokolat', sortOrder: 2 },
+  ],
+  'mavad-ghazaei': [
+    { name: 'برنج', slug: 'berenj', sortOrder: 1 },
+    { name: 'روغن', slug: 'roghan', sortOrder: 2 },
+    { name: 'رب و چاشنی', slug: 'rob', sortOrder: 3 },
+  ],
+  'mive-sabzi': [
+    { name: 'میوه', slug: 'mive', sortOrder: 1 },
+    { name: 'سبزیجات', slug: 'sabzi', sortOrder: 2 },
+  ],
+  shoyandeha: [
+    { name: 'ظرفشویی', slug: 'zarfshuyi', sortOrder: 1 },
+    { name: 'لباسشویی', slug: 'labashui', sortOrder: 2 },
+  ],
+  'mahsulat-khane': [
+    { name: 'روشنایی', slug: 'roshanaei', sortOrder: 1 },
+    { name: 'لوازم خانگی', slug: 'lavazem', sortOrder: 2 },
+  ],
+  'nan-sobhane': [
+    { name: 'نان', slug: 'nan', sortOrder: 1 },
+    { name: 'صبحانه', slug: 'sobhane', sortOrder: 2 },
+  ],
+  konserv: [
+    { name: 'کنسرو', slug: 'konserv-tag', sortOrder: 1 },
+    { name: 'کمپوت', slug: 'compote', sortOrder: 2 },
+  ],
+  behdasht: [
+    { name: 'مراقبت مو', slug: 'mo', sortOrder: 1 },
+    { name: 'بهداشت دهان', slug: 'dandan', sortOrder: 2 },
+  ],
+};
+
+const productTagMap: Record<string, string> = {
+  'shir-pasteurized-1l': 'shir',
+  'mast-khamei-900g': 'mast',
+  'panir-liquan-400g': 'panir',
+  'ab-madani-1-5l': 'ab-madani',
+  'nooshabe-pepsi-1-5l': 'nooshabe',
+  'abmive-sanich-1l': 'abmive',
+  'chips-mazmaz-100g': 'chips',
+  'shokolat-farmand': 'shokolat',
+  'berenj-tarem-5kg': 'berenj',
+  'roghan-1-5l': 'roghan',
+  'rob-goje-800g': 'rob',
+  'sib-1kg': 'mive',
+  'goje-1kg': 'sabzi',
+  'maye-zarfshuyi-1l': 'zarfshuyi',
+  'powder-labashui-2kg': 'labashui',
+  'lamp-led-9w': 'roshanaei',
+  'nan-barbarei': 'nan',
+  'kare-100g': 'sobhane',
+  'konserv-lubia': 'konserv-tag',
+  'compote-holo': 'compote',
+  'shampo-400ml': 'mo',
+  'dandan-shostan': 'dandan',
+};
+
 async function upsertProduct(prod: ProductSeed) {
   const category = await prisma.category.findUnique({ where: { slug: prod.categorySlug } });
   if (!category) return;
 
   const image = prod.image ?? category.image;
   const { categorySlug, ...data } = prod;
+
+  let tagId: string | null = null;
+  const tagSlug = productTagMap[prod.slug];
+  if (tagSlug) {
+    const tag = await prisma.tag.findUnique({
+      where: { categoryId_slug: { categoryId: category.id, slug: tagSlug } },
+    });
+    tagId = tag?.id ?? null;
+  }
 
   await prisma.product.upsert({
     where: { slug: prod.slug },
@@ -473,6 +553,7 @@ async function upsertProduct(prod: ProductSeed) {
       discountPrice: data.discountPrice ?? null,
       stock: data.stock,
       categoryId: category.id,
+      tagId,
       isFeatured: data.isFeatured ?? false,
       isNew: data.isNew ?? false,
       image,
@@ -482,6 +563,7 @@ async function upsertProduct(prod: ProductSeed) {
       ...data,
       discountPrice: data.discountPrice ?? null,
       categoryId: category.id,
+      tagId,
       image,
       isFeatured: data.isFeatured ?? false,
       isNew: data.isNew ?? false,
@@ -751,6 +833,64 @@ async function main() {
     });
   }
   console.log('✅ Categories created');
+
+  for (const [categorySlug, tags] of Object.entries(categoryTags)) {
+    const category = await prisma.category.findUnique({ where: { slug: categorySlug } });
+    if (!category) continue;
+
+    for (const tag of tags) {
+      await prisma.tag.upsert({
+        where: { categoryId_slug: { categoryId: category.id, slug: tag.slug } },
+        update: { name: tag.name, sortOrder: tag.sortOrder, icon: tag.icon ?? null },
+        create: {
+          categoryId: category.id,
+          name: tag.name,
+          slug: tag.slug,
+          sortOrder: tag.sortOrder,
+          icon: tag.icon ?? null,
+        },
+      });
+    }
+  }
+  console.log('✅ Tags created');
+
+  await prisma.slider.deleteMany({});
+  await prisma.slider.createMany({
+    data: [
+      {
+        title: 'تخفیف ویژه لبنیات',
+        image: '/images/sliders/dairy-sale.jpg',
+        linkUrl: '/category/labaniat',
+        sortOrder: 1,
+        placement: 'HOME_TOP',
+        isActive: true,
+      },
+      {
+        title: 'ارسال رایگان',
+        image: '/images/sliders/free-shipping.jpg',
+        linkUrl: '/products?discounted=true',
+        sortOrder: 2,
+        placement: 'HOME_TOP',
+        isActive: true,
+      },
+      {
+        title: 'محصولات تازه',
+        image: '/images/sliders/fresh.jpg',
+        linkUrl: '/category/mive-sabzi',
+        sortOrder: 1,
+        placement: 'HOME_MID',
+        isActive: true,
+      },
+    ],
+  });
+  console.log('✅ Sliders created');
+
+  await prisma.customerGroup.upsert({
+    where: { id: 'seed-vip-group' },
+    update: { name: 'مشتریان VIP', description: 'مشتریان با خرید بالا' },
+    create: { id: 'seed-vip-group', name: 'مشتریان VIP', description: 'مشتریان با خرید بالا' },
+  });
+  console.log('✅ Customer groups created');
 
   await prisma.product.updateMany({
     where: { slug: { startsWith: 'fake-' } },

@@ -14,6 +14,15 @@ router.get(
 );
 
 router.get(
+  '/:slug/tags',
+  asyncHandler(async (req, res) => {
+    const { tagService } = await import('../services/tag.service');
+    const result = await tagService.getByCategorySlug(paramId(req.params.slug));
+    successResponse(res, result.tags);
+  })
+);
+
+router.get(
   '/:slug',
   asyncHandler(async (req, res) => {
     const category = await categoryService.getBySlug(paramId(req.params.slug));

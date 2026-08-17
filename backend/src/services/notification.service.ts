@@ -4,6 +4,7 @@ import type { NotificationType, OrderStatus } from '@prisma/client';
 
 const ORDER_STATUS_MESSAGES: Record<OrderStatus, string> = {
   NEW: 'سفارش جدید شما ثبت شد و در انتظار بررسی است.',
+  REVIEWING: 'سفارش شما در انتظار بررسی روش پرداخت است.',
   PREPARING: 'سفارش شما در حال آماده‌سازی است.',
   SHIPPED: 'پیک سفارش شما را ارسال کرد. به زودی به دستتان می‌رسد.',
   DELIVERED: 'سفارش شما با موفقیت تحویل داده شد.',
@@ -12,6 +13,7 @@ const ORDER_STATUS_MESSAGES: Record<OrderStatus, string> = {
 
 const ORDER_STATUS_TITLES: Record<OrderStatus, string> = {
   NEW: 'ثبت سفارش',
+  REVIEWING: 'بررسی پرداخت',
   PREPARING: 'آماده‌سازی سفارش',
   SHIPPED: 'ارسال با پیک',
   DELIVERED: 'تحویل سفارش',

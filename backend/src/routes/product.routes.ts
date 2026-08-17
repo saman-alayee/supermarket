@@ -14,11 +14,20 @@ router.get(
 );
 
 router.get(
+  '/home-feed',
+  asyncHandler(async (_req, res) => {
+    const feed = await productService.getHomeFeed();
+    successResponse(res, feed);
+  })
+);
+
+router.get(
   '/',
   asyncHandler(async (req, res) => {
     const {
       categoryId,
       category,
+      tagId,
       search,
       featured,
       discounted,
@@ -30,6 +39,7 @@ router.get(
     const result = await productService.getAll({
       categoryId: categoryId as string,
       categorySlug: category as string,
+      tagId: tagId as string || (req.query.tag as string),
       search: search as string,
       featured: featured === 'true',
       discounted: discounted === 'true',
@@ -38,6 +48,23 @@ router.get(
       limit: limit ? parseInt(limit as string) : 20,
     });
     successResponse(res, result);
+  })
+);
+
+router.get(
+  '/category/:slug/by-tags',
+  asyncHandler(async (req, res) => {
+    const grouped = await productService.getCategoryGroupedByTags(paramId(req.params.slug));
+    successResponse(res, grouped);
+  })
+);
+
+router.get(
+  '/:slug/related',
+  asyncHandler(async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 8;
+    const related = await productService.getRelatedByTag(paramId(req.params.slug), limit);
+    successResponse(res, related);
   })
 );
 

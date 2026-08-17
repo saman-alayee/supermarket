@@ -3,4 +3,5 @@
     <NuxtPage />
   </NuxtLayout>
   <AppToast />
+  <PwaInstallPrompt />
 </template>

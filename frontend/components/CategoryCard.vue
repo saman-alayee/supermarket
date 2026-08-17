@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import type { Category } from '~/types';
 
-defineProps<{
-  category: Category;
-  active?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    category: Category;
+    active?: boolean;
+    size?: 'md' | 'lg';
+  }>(),
+  {
+    active: false,
+    size: 'lg',
+  }
+);
 
 const { getCategoryImage } = useFormat();
 
@@ -17,32 +24,49 @@ const categoryColors: Record<string, string> = {
   shoyandeha: 'bg-purple-50',
   'mahsulat-khane': 'bg-pink-50',
 };
+
+const sizeClasses = {
+  md: {
+    wrap: 'min-w-[80px]',
+    box: 'w-16 h-16 rounded-2xl',
+    img: 'w-11 h-11',
+    text: 'text-xs',
+  },
+  lg: {
+    wrap: 'min-w-[96px]',
+    box: 'w-24 h-24 rounded-3xl',
+    img: 'w-16 h-16',
+    text: 'text-sm',
+  },
+};
 </script>
 
 <template>
   <NuxtLink
     :to="`/categories/${category.slug}`"
-    class="flex flex-col items-center gap-2 min-w-[72px] cursor-pointer group"
+    :class="['flex flex-col items-center gap-2.5 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
   >
     <div
       :class="[
-        'w-16 h-16 rounded-2xl flex items-center justify-center transition-all',
+        sizeClasses[size].box,
+        'flex items-center justify-center transition-transform shadow-sm',
         categoryColors[category.slug] || 'bg-gray-50',
-        active ? 'ring-2 ring-primary-500 ring-offset-2' : 'group-hover:scale-105',
+        active ? 'ring-2 ring-primary-400 ring-offset-2' : 'group-hover:scale-105 group-active:scale-95',
       ]"
     >
       <img
         v-if="category.image"
         :src="getCategoryImage(category.image)"
         :alt="category.name"
-        class="w-10 h-10 object-contain"
+        :class="[sizeClasses[size].img, 'object-contain']"
       />
-      <span v-else class="text-2xl">🛒</span>
+      <span v-else class="text-3xl">🛒</span>
     </div>
     <span
       :class="[
-        'text-xs font-medium text-center',
-        active ? 'text-primary-600' : 'text-gray-600',
+        sizeClasses[size].text,
+        'font-semibold text-center leading-tight px-1',
+        active ? 'text-primary-600' : 'text-gray-700',
       ]"
     >
       {{ category.name }}

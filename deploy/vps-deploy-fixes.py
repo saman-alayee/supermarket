@@ -36,34 +36,60 @@ def run(client, cmd, timeout=300):
     _, stdout, stderr = client.exec_command(cmd, timeout=timeout)
     out = stdout.read().decode("utf-8", "replace")
     err = stderr.read().decode("utf-8", "replace")
+    code = stdout.channel.recv_exit_status()
     if out.strip():
         print(out.rstrip())
-    if err.strip():
+    if err.strip() and code != 0:
         print(err.rstrip())
-    return stdout.channel.recv_exit_status()
+    return code
 
 
-def upload_bytes(client, remote: str, data: bytes, retries: int = 4):
-    for attempt in range(1, retries + 1):
-        try:
-            sftp = client.open_sftp()
-            with sftp.file(remote, "wb") as f:
-                chunk_size = 64 * 1024
-                for i in range(0, len(data), chunk_size):
-                    f.write(data[i : i + chunk_size])
-            sftp.close()
-            print(f"Uploaded {remote} ({len(data) / 1024 / 1024:.1f} MB)")
-            return client
-        except Exception as exc:
-            print(f"Upload attempt {attempt} failed: {exc}")
+def remote_size(client, remote: str) -> int:
+    _, stdout, _ = client.exec_command(f"stat -c%s {remote} 2>/dev/null || echo 0")
+    stdout.channel.recv_exit_status()
+    try:
+        return int(stdout.read().decode().strip() or "0")
+    except ValueError:
+        return 0
+
+
+def upload_bytes(client, remote: str, data: bytes, retries: int = 6):
+    part_size = 128 * 1024
+    total = len(data)
+    uploaded = 0
+
+    while uploaded < total:
+        part = data[uploaded : uploaded + part_size]
+        tmp = f"{remote}.part"
+        for attempt in range(1, retries + 1):
             try:
-                client.close()
-            except Exception:
-                pass
-            if attempt == retries:
-                raise
-            time.sleep(2)
-            client = connect()
+                sftp = client.open_sftp()
+                with sftp.file(tmp, "wb") as f:
+                    f.write(part)
+                sftp.close()
+                append = ">" if uploaded == 0 else ">>"
+                run(client, f"cat {tmp} {append} {remote} && rm -f {tmp}")
+                uploaded += len(part)
+                print(f"Uploaded {remote}: {uploaded}/{total} bytes")
+                break
+            except Exception as exc:
+                print(f"Upload part failed (attempt {attempt}): {exc}")
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                if attempt == retries:
+                    raise
+                time.sleep(3)
+                client = connect()
+                remote_size_val = remote_size(client, remote)
+                uploaded = min(remote_size_val, total)
+                if uploaded >= total:
+                    print(f"Remote {remote} already complete ({uploaded} bytes)")
+                    return client
+                part = data[uploaded : uploaded + part_size]
+
+    print(f"Uploaded {remote} ({total / 1024 / 1024:.1f} MB total)")
     return client
 
 

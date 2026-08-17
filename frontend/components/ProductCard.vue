@@ -5,9 +5,28 @@ const props = defineProps<{ product: Product }>();
 
 const cartStore = useCartStore();
 const { formatPrice, getProductImage } = useFormat();
+const { isFavorite, toggleFavorite, fetchFavorites } = useFavorites();
 
 const quantity = computed(() => cartStore.getItemQuantity(props.product.id));
 const isAdding = computed(() => cartStore.addingProductId === props.product.id);
+const favorited = computed(() => isFavorite(props.product.id));
+const favLoading = ref(false);
+
+onMounted(() => {
+  fetchFavorites();
+});
+
+async function handleFavorite(event: Event) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (favLoading.value) return;
+  favLoading.value = true;
+  try {
+    await toggleFavorite(props.product.id);
+  } finally {
+    favLoading.value = false;
+  }
+}
 
 async function handleAdd() {
   await cartStore.addItem(props.product.id);
@@ -28,7 +47,23 @@ async function handleDecrease() {
 
 <template>
   <div class="card group relative">
-    <!-- Discount badge -->
+    <button
+      type="button"
+      :class="[
+        'absolute top-2 end-2 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm',
+        favorited ? 'bg-red-50 text-red-500' : 'bg-white/90 text-gray-400 hover:text-red-400',
+      ]"
+      :disabled="favLoading"
+      aria-label="علاقه‌مندی"
+      @click="handleFavorite"
+    >
+      <AppIcon
+        :name="favorited ? 'lucide:heart' : 'lucide:heart'"
+        size="sm"
+        :class="favorited ? 'fill-current' : ''"
+      />
+    </button>
+
     <div
       v-if="product.discountPercent > 0"
       class="absolute top-2 start-2 z-10 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg"
@@ -36,15 +71,13 @@ async function handleDecrease() {
       {{ product.discountPercent }}٪
     </div>
 
-    <!-- New badge -->
     <div
       v-if="product.isNew"
-      class="absolute top-2 end-2 z-10 bg-accent-500 text-white text-xs font-bold px-2 py-1 rounded-lg"
+      class="absolute top-11 end-2 z-10 bg-accent-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg"
     >
       جدید
     </div>
 
-    <!-- Image -->
     <NuxtLink :to="`/products/${product.slug}`" class="block aspect-square bg-gray-50 p-4">
       <img
         :src="getProductImage(product.image)"
@@ -54,7 +87,6 @@ async function handleDecrease() {
       />
     </NuxtLink>
 
-    <!-- Info -->
     <div class="p-3">
       <NuxtLink :to="`/products/${product.slug}`">
         <h3 class="font-medium text-sm text-gray-800 line-clamp-2 mb-1 min-h-[2.5rem]">
@@ -74,7 +106,6 @@ async function handleDecrease() {
           </p>
         </div>
 
-        <!-- Add to cart button -->
         <div v-if="!product.inStock" class="text-xs text-red-500 font-medium">
           ناموجود
         </div>

@@ -6,6 +6,7 @@ const unreadCount = ref(0);
 
 const navItems = [
   { to: '/profile', label: 'حساب', icon: 'lucide:user', exact: true },
+  { to: '/profile/favorites', label: 'علاقه‌مندی', icon: 'lucide:heart' },
   { to: '/profile/orders', label: 'سفارش‌ها', icon: 'lucide:package' },
   { to: '/profile/notifications', label: 'اعلان‌ها', icon: 'lucide:bell', badge: true },
   { to: '/profile/addresses', label: 'آدرس‌ها', icon: 'lucide:map-pin' },

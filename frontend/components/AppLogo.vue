@@ -11,9 +11,9 @@ withDefaults(
 );
 
 const sizeClass = {
-  sm: 'h-8',
-  md: 'h-10 md:h-11',
-  lg: 'h-12 md:h-14',
+  sm: 'h-9',
+  md: 'h-11 md:h-12',
+  lg: 'h-14 md:h-16',
 };
 </script>
 
@@ -22,7 +22,8 @@ const sizeClass = {
     <img
       src="/logo.svg"
       alt="KIAA KALA"
-      :class="[sizeClass[size], 'w-auto object-contain']"
+      :class="[sizeClass[size], 'w-auto object-contain drop-shadow-sm scale-110']"
+      style="filter: contrast(1.08) saturate(1.1);"
     />
   </component>
 </template>

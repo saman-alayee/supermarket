@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Order, OrderStatus, Pagination } from '~/types';
-import { ORDER_STATUS_LABELS } from '~/types';
+import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '~/types';
 
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
@@ -18,20 +18,36 @@ const selectedOrder = ref<Order | null>(null);
 const statusNote = ref('');
 const statusError = ref('');
 
-const statusOptions: OrderStatus[] = ['NEW', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+const statusOptions: OrderStatus[] = ['NEW', 'REVIEWING', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   NEW: ['PREPARING', 'CANCELLED'],
+  REVIEWING: ['NEW', 'PREPARING', 'CANCELLED'],
   PREPARING: ['SHIPPED', 'CANCELLED'],
   SHIPPED: ['DELIVERED', 'CANCELLED'],
 };
 
 const STATUS_HINTS: Partial<Record<OrderStatus, string>> = {
+  REVIEWING: 'سفارش در انتظار تأیید روش پرداخت است',
+  NEW: 'پرداخت تأیید شد — آماده آماده‌سازی',
   SHIPPED: 'پیام «پیک ارسال شده» به کاربر ارسال می‌شود',
   PREPARING: 'کاربر از آماده‌سازی سفارش مطلع می‌شود',
   DELIVERED: 'سفارش تکمیل شد',
   CANCELLED: 'سفارش لغو می‌شود',
 };
+
+function paymentLabel(method?: Order['paymentMethod']) {
+  return method ? PAYMENT_METHOD_LABELS[method] : '—';
+}
+
+function paymentDetailsText(order: Order) {
+  const details = order.paymentDetails;
+  if (!details || typeof details !== 'object') return '';
+  return Object.entries(details)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(' · ');
+}
 
 onMounted(loadOrders);
 
@@ -136,6 +152,9 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
             <span class="text-gray-400">{{ formatShortDate(order.createdAt) }}</span>
             <span class="font-bold">{{ formatPrice(order.totalPrice) }}</span>
           </div>
+          <p v-if="order.paymentMethod && order.paymentMethod !== 'CASH_AT_DOOR'" class="text-xs text-indigo-600 mt-1">
+            {{ paymentLabel(order.paymentMethod) }}
+          </p>
         </div>
         <EmptyState v-if="!orders.length" message="سفارشی یافت نشد" />
       </div>
@@ -172,6 +191,13 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
             class="mt-2"
           />
           <p v-if="selectedOrder.couponCode"><span class="text-gray-500">کد تخفیف:</span> {{ selectedOrder.couponCode }}</p>
+          <p>
+            <span class="text-gray-500">روش پرداخت:</span>
+            {{ paymentLabel(selectedOrder.paymentMethod) }}
+          </p>
+          <p v-if="paymentDetailsText(selectedOrder)" class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2">
+            {{ paymentDetailsText(selectedOrder) }}
+          </p>
           <p v-if="selectedOrder.discountAmount">
             <span class="text-gray-500">تخفیف:</span> {{ formatPrice(selectedOrder.discountAmount) }}
           </p>
