@@ -1,14 +1,30 @@
 import type { Product } from '~/types';
 
+const LOCAL_KEY = 'kiaakala-favorites';
 const favoriteIds = ref<Set<string>>(new Set());
 const favoritesLoaded = ref(false);
 const favoritesLoading = ref(false);
+
+function readLocalIds(): string[] {
+  if (!import.meta.client) return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalIds(ids: Set<string>) {
+  if (!import.meta.client) return;
+  localStorage.setItem(LOCAL_KEY, JSON.stringify([...ids]));
+}
 
 export function useFavorites() {
   const authStore = useAuthStore();
   const api = useApi();
   const toast = useToast();
-  const route = useRoute();
 
   const count = computed(() => favoriteIds.value.size);
 
@@ -16,15 +32,22 @@ export function useFavorites() {
     return favoriteIds.value.has(productId);
   }
 
-  async function fetchFavorites() {
-    if (!authStore.isLoggedIn) {
-      favoriteIds.value = new Set();
-      favoritesLoaded.value = true;
-      return [];
-    }
+  async function fetchFavoriteProducts(ids: string[]) {
+    if (!ids.length) return [] as Product[];
+    const { data } = await api.get<{ products: Product[] }>(`/products?ids=${ids.join(',')}&limit=${ids.length}`);
+    return data.products;
+  }
 
+  async function fetchFavorites() {
     favoritesLoading.value = true;
     try {
+      if (!authStore.isLoggedIn) {
+        const ids = readLocalIds();
+        favoriteIds.value = new Set(ids);
+        favoritesLoaded.value = true;
+        return fetchFavoriteProducts(ids);
+      }
+
       const { data } = await api.get<Product[]>('/favorites');
       favoriteIds.value = new Set(data.map((item) => item.id));
       favoritesLoaded.value = true;
@@ -32,21 +55,20 @@ export function useFavorites() {
     } catch {
       favoriteIds.value = new Set();
       favoritesLoaded.value = true;
-      return [];
+      return [] as Product[];
     } finally {
       favoritesLoading.value = false;
     }
   }
 
-  function promptLogin() {
-    toast.info('برای افزودن به علاقه‌مندی‌ها وارد حساب شوید');
-    navigateTo(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`);
-  }
-
   async function addFavorite(productId: string) {
     if (!authStore.isLoggedIn) {
-      promptLogin();
-      return false;
+      const next = new Set(favoriteIds.value);
+      next.add(productId);
+      favoriteIds.value = next;
+      writeLocalIds(next);
+      toast.success('به علاقه‌مندی‌ها اضافه شد');
+      return true;
     }
 
     try {
@@ -61,7 +83,14 @@ export function useFavorites() {
   }
 
   async function removeFavorite(productId: string) {
-    if (!authStore.isLoggedIn) return false;
+    if (!authStore.isLoggedIn) {
+      const next = new Set(favoriteIds.value);
+      next.delete(productId);
+      favoriteIds.value = next;
+      writeLocalIds(next);
+      toast.success('از علاقه‌مندی‌ها حذف شد');
+      return true;
+    }
 
     try {
       await api.delete(`/favorites/${productId}`);
@@ -77,11 +106,6 @@ export function useFavorites() {
   }
 
   async function toggleFavorite(productId: string) {
-    if (!authStore.isLoggedIn) {
-      promptLogin();
-      return;
-    }
-
     if (isFavorite(productId)) {
       await removeFavorite(productId);
     } else {
@@ -92,11 +116,19 @@ export function useFavorites() {
   watch(
     () => authStore.isLoggedIn,
     async (loggedIn) => {
-      favoritesLoaded.value = false;
       if (loggedIn) {
+        const localIds = readLocalIds();
+        if (localIds.length) {
+          try {
+            await api.post('/favorites/sync', { productIds: localIds });
+            localStorage.removeItem(LOCAL_KEY);
+          } catch {
+            // keep local until next login
+          }
+        }
         await fetchFavorites();
       } else {
-        favoriteIds.value = new Set();
+        favoriteIds.value = new Set(readLocalIds());
         favoritesLoaded.value = true;
       }
     }
@@ -112,6 +144,5 @@ export function useFavorites() {
     addFavorite,
     removeFavorite,
     toggleFavorite,
-    promptLogin,
   };
 }

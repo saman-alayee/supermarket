@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { normalizeDigits, normalizePhoneInput } from '~/utils/normalize';
-
 const authStore = useAuthStore();
 const route = useRoute();
 
@@ -13,19 +11,18 @@ const error = ref('');
 const devCode = ref('');
 
 const redirect = computed(() => (route.query.redirect as string) || '');
-const loginError = computed(() => route.query.error as string);
+
+function safeRedirectTarget(raw: string) {
+  // Only same-origin relative paths; reject protocol-relative //evil
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/profile';
+  if (raw.startsWith('/admin')) return '/profile';
+  return raw;
+}
 
 async function afterLogin() {
   await authStore.fetchProfile().catch(() => undefined);
   await nextTick();
-
-  if (redirect.value?.startsWith('/admin') && !authStore.isAdmin) {
-    error.value = 'این حساب دسترسی ادمین ندارد';
-    authStore.logout();
-    return;
-  }
-
-  const target = redirect.value || (authStore.isAdmin ? '/admin' : '/profile');
+  const target = safeRedirectTarget(redirect.value || '/profile');
   await navigateTo(target, { replace: true });
 }
 
@@ -68,7 +65,7 @@ function switchMode(next: 'otp' | 'password') {
   password.value = '';
 }
 
-useHead({ title: 'ورود - هایپرمارکت' });
+useHead({ title: 'ورود - KIAA KALA' });
 definePageMeta({ layout: false });
 </script>
 
@@ -80,17 +77,9 @@ definePageMeta({ layout: false });
       </div>
 
       <div class="card p-6">
-        <h1 class="text-lg font-bold text-gray-800 mb-1">ورود / ثبت‌نام</h1>
-        <p class="text-sm text-gray-500 mb-4">یکی از روش‌های ورود را انتخاب کنید</p>
+        <h1 class="text-lg font-bold text-gray-800 mb-1">ورود / ثبت‌نام مشتری</h1>
+        <p class="text-sm text-gray-500 mb-4">با پیامک یا رمز عبور شخصی وارد شوید</p>
 
-        <div
-          v-if="loginError === 'not-admin'"
-          class="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4"
-        >
-          حساب شما دسترسی پنل ادمین ندارد. فقط با شماره ادمین وارد شوید.
-        </div>
-
-        <!-- Mode tabs -->
         <div class="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
           <button
             type="button"
@@ -110,11 +99,10 @@ definePageMeta({ layout: false });
             ]"
             @click="switchMode('password')"
           >
-            ورود با رمز ثابت
+            ورود با رمز
           </button>
         </div>
 
-        <!-- OTP mode -->
         <template v-if="mode === 'otp'">
           <form v-if="step === 'phone'" @submit.prevent="sendOtp">
             <label class="block text-sm font-medium text-gray-700 mb-1">شماره موبایل</label>
@@ -134,8 +122,8 @@ definePageMeta({ layout: false });
 
           <form v-else @submit.prevent="verifyOtp">
             <p class="text-sm text-gray-500 mb-4">
-              کد تأیید به {{ normalizePhoneInput(phone) }} ارسال شد
-              <button type="button" class="text-primary-600 mr-1" @click="step = 'phone'">تغییر</button>
+              کد تأیید ارسال شد
+              <button type="button" class="text-primary-600 mr-1" @click="step = 'phone'">تغییر شماره</button>
             </p>
             <div v-if="devCode" class="bg-yellow-50 text-yellow-800 text-sm p-3 rounded-xl mb-4">
               کد توسعه: <strong dir="ltr">{{ devCode }}</strong>
@@ -159,7 +147,6 @@ definePageMeta({ layout: false });
           </form>
         </template>
 
-        <!-- Password mode -->
         <form v-else @submit.prevent="loginWithPassword">
           <label class="block text-sm font-medium text-gray-700 mb-1">شماره موبایل</label>
           <input
@@ -167,7 +154,7 @@ definePageMeta({ layout: false });
             type="tel"
             required
             class="input-field mb-4"
-            placeholder="09120000000"
+            placeholder="09123456789"
             dir="ltr"
           />
           <label class="block text-sm font-medium text-gray-700 mb-1">رمز عبور</label>
@@ -175,13 +162,13 @@ definePageMeta({ layout: false });
             v-model="password"
             type="password"
             required
-            minlength="4"
+            minlength="6"
             class="input-field mb-4"
-            placeholder="رمز عبور"
+            placeholder="رمز عبور شخصی"
             dir="ltr"
           />
           <p class="text-xs text-gray-400 mb-4">
-            ادمین: شماره <span dir="ltr">09120000000</span> — OTP: <span dir="ltr">123456</span> — رمز: <span dir="ltr">admin1234</span>
+            اگر هنوز رمز ندارید، با پیامک وارد شوید و از پروفایل رمز بگذارید.
           </p>
           <div v-if="error" class="bg-red-50 text-red-600 text-sm p-3 rounded-xl mb-4">{{ error }}</div>
           <button type="submit" class="btn-primary w-full" :disabled="authStore.loading">
@@ -190,8 +177,9 @@ definePageMeta({ layout: false });
         </form>
       </div>
 
-      <p class="text-center text-sm text-gray-400 mt-4">
-        <NuxtLink to="/" class="hover:text-primary-600">بازگشت به فروشگاه</NuxtLink>
+      <p class="text-center text-sm text-gray-400 mt-4 space-y-1">
+        <NuxtLink to="/" class="block hover:text-primary-600">بازگشت به فروشگاه</NuxtLink>
+        <NuxtLink to="/admin/login" class="block hover:text-primary-600">ورود مدیران</NuxtLink>
       </p>
     </div>
   </div>

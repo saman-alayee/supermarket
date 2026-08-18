@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+@import './fonts.css';
 
 @tailwind base;
 @tailwind components;
@@ -6,7 +6,7 @@
 
 @layer base {
   html {
-    font-family: 'Vazirmatn', Tahoma, sans-serif;
+    font-family: 'IRANSansX', Tahoma, sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
 

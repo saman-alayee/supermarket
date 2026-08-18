@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { config } from '../config';
 import { generateOtpCode, generateToken } from '../utils/helpers';
@@ -6,6 +7,8 @@ import { normalizeDigits, normalizePhone } from '../utils/normalize';
 import { smsService } from './sms.service';
 
 export type UserRole = 'CUSTOMER' | 'ADMIN';
+
+const PASSWORD_MIN_LENGTH = 6;
 
 export class AuthService {
   async sendOtp(phone: string) {
@@ -27,7 +30,7 @@ export class AuthService {
     return { message: 'کد تأیید ارسال شد', devCode: config.otp.devMode ? code : undefined };
   }
 
-  async verifyOtp(phone: string, code: string) {
+  async verifyOtp(phone: string, code: string, options?: { requireAdmin?: boolean }) {
     const normalizedPhone = this.normalizePhone(phone);
     const normalizedCode = normalizeDigits(code).trim();
 
@@ -51,25 +54,104 @@ export class AuthService {
     });
 
     const user = await this.findOrCreateUser(normalizedPhone);
-    return this.buildAuthResponse(user);
-  }
 
-  async loginWithPassword(phone: string, password: string) {
-    const normalizedPhone = this.normalizePhone(phone);
-
-    if (password !== config.adminPassword) {
-      throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
-    }
-
-    const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
-    if (!user || user.role !== 'ADMIN') {
-      throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
-    }
     if (!user.isActive) {
       throw new AppError(403, 'حساب کاربری غیرفعال است');
     }
 
+    if (options?.requireAdmin && user.role !== 'ADMIN') {
+      throw new AppError(403, 'این صفحه مخصوص ورود مدیران است');
+    }
+
     return this.buildAuthResponse(user);
+  }
+
+  /** Customer (or any user with personal password) login */
+  async loginWithPassword(phone: string, password: string, options?: { requireAdmin?: boolean }) {
+    const normalizedPhone = this.normalizePhone(phone);
+    const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+
+    if (!user || !user.isActive) {
+      throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
+    }
+
+    if (options?.requireAdmin && user.role !== 'ADMIN') {
+      throw new AppError(403, 'این صفحه مخصوص ورود مدیران است');
+    }
+
+    const ok = await this.verifyUserPassword(user, password);
+    if (!ok) {
+      throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
+    }
+
+    return this.buildAuthResponse(user);
+  }
+
+  async setPassword(
+    userId: string,
+    data: { password: string; currentPassword?: string; otpCode?: string }
+  ) {
+    if (!data.password || data.password.length < PASSWORD_MIN_LENGTH) {
+      throw new AppError(400, `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} کاراکتر باشد`);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError(404, 'کاربر یافت نشد');
+
+    const otpVerified = data.otpCode
+      ? await this.consumeValidOtp(user.phone, data.otpCode)
+      : false;
+
+    if (user.passwordHash && !otpVerified) {
+      if (!data.currentPassword) {
+        throw new AppError(400, 'رمز عبور فعلی الزامی است');
+      }
+      const match = await bcrypt.compare(data.currentPassword, user.passwordHash);
+      if (!match) {
+        throw new AppError(400, 'رمز عبور فعلی اشتباه است');
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return {
+      hasPassword: true,
+      message: user.passwordHash ? 'رمز عبور تغییر کرد' : 'رمز عبور ذخیره شد',
+    };
+  }
+
+  async confirmOtp(phone: string, code: string) {
+    const normalizedPhone = this.normalizePhone(phone);
+    await this.consumeValidOtp(normalizedPhone, code);
+    return { verified: true, phone: normalizedPhone };
+  }
+
+  private async consumeValidOtp(phone: string, code: string): Promise<boolean> {
+    const normalizedCode = normalizeDigits(code).trim();
+    const otpRecord = await prisma.otpCode.findFirst({
+      where: {
+        phone,
+        code: normalizedCode,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new AppError(400, 'کد تأیید نامعتبر یا منقضی شده است');
+    }
+
+    await prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { used: true },
+    });
+
+    return true;
   }
 
   async getProfile(userId: string) {
@@ -81,6 +163,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        passwordHash: true,
         createdAt: true,
         addresses: { orderBy: { isDefault: 'desc' } },
         _count: { select: { orders: true } },
@@ -88,7 +171,9 @@ export class AuthService {
     });
 
     if (!user) throw new AppError(404, 'کاربر یافت نشد');
-    return user;
+
+    const { passwordHash, ...rest } = user;
+    return { ...rest, hasPassword: Boolean(passwordHash) };
   }
 
   async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
@@ -101,8 +186,28 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        passwordHash: true,
       },
-    });
+    }).then(({ passwordHash, ...rest }) => ({
+      ...rest,
+      hasPassword: Boolean(passwordHash),
+    }));
+  }
+
+  private async verifyUserPassword(
+    user: { passwordHash: string | null; role: UserRole },
+    password: string
+  ): Promise<boolean> {
+    if (user.passwordHash) {
+      return bcrypt.compare(password, user.passwordHash);
+    }
+
+    // Legacy fallback: shared ADMIN_PASSWORD only for admins without personal hash
+    if (user.role === 'ADMIN' && password === config.adminPassword) {
+      return true;
+    }
+
+    return false;
   }
 
   private async findOrCreateUser(phone: string) {
@@ -137,6 +242,7 @@ export class AuthService {
     firstName: string | null;
     lastName: string | null;
     role: UserRole;
+    passwordHash?: string | null;
   }) {
     const token = generateToken({
       userId: user.id,
@@ -152,6 +258,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        hasPassword: Boolean(user.passwordHash),
       },
     };
   }

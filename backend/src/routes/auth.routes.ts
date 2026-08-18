@@ -21,6 +21,12 @@ const loginPasswordSchema = z.object({
   password: z.string().min(4, 'رمز عبور الزامی است'),
 });
 
+const setPasswordSchema = z.object({
+  password: z.string().min(6, 'رمز عبور باید حداقل ۶ کاراکتر باشد'),
+  currentPassword: z.string().min(1).optional(),
+  otpCode: z.string().min(4).max(6).optional(),
+});
+
 const updateProfileSchema = z.object({
   firstName: z.string().min(2).optional(),
   lastName: z.string().min(2).optional(),
@@ -47,12 +53,59 @@ router.post(
 );
 
 router.post(
+  '/confirm-otp',
+  authLimiter,
+  validate(verifyOtpSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.confirmOtp(req.body.phone, req.body.code);
+    successResponse(res, result, 'کد تأیید شد');
+  })
+);
+
+/** Customer login with personal password */
+router.post(
   '/login-password',
   authLimiter,
   validate(loginPasswordSchema),
   asyncHandler(async (req, res) => {
     const result = await authService.loginWithPassword(req.body.phone, req.body.password);
     successResponse(res, result, 'ورود موفق');
+  })
+);
+
+/** Admin-only password login */
+router.post(
+  '/admin/login-password',
+  authLimiter,
+  validate(loginPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.loginWithPassword(req.body.phone, req.body.password, {
+      requireAdmin: true,
+    });
+    successResponse(res, result, 'ورود موفق');
+  })
+);
+
+/** Admin-only OTP verify */
+router.post(
+  '/admin/verify-otp',
+  authLimiter,
+  validate(verifyOtpSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.verifyOtp(req.body.phone, req.body.code, {
+      requireAdmin: true,
+    });
+    successResponse(res, result, 'ورود موفق');
+  })
+);
+
+router.put(
+  '/password',
+  authenticate,
+  validate(setPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const result = await authService.setPassword(req.user!.userId, req.body);
+    successResponse(res, result, result.message);
   })
 );
 

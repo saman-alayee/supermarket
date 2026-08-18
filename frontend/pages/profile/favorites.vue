@@ -1,7 +1,6 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'profile', middleware: 'auth' });
+definePageMeta({ layout: 'profile' });
 
-const api = useApi();
 const { fetchFavorites } = useFavorites();
 const products = ref<import('~/types').Product[]>([]);
 const loading = ref(true);

@@ -5,7 +5,9 @@ import { generateOrderNumber } from '../utils/helpers';
 import { cartService } from './cart.service';
 import { couponService } from './coupon.service';
 import { notificationService } from './notification.service';
+import { authService } from './auth.service';
 import { smsService } from './sms.service';
+import { normalizePhone } from '../utils/normalize';
 
 export type OrderStatus =
   | 'NEW'
@@ -68,6 +70,50 @@ function validatePaymentDetails(
   if (!paymentDetails || Object.keys(paymentDetails).length === 0) {
     throw new AppError(400, 'جزئیات پرداخت برای این روش الزامی است');
   }
+
+  if (paymentMethod === 'RETIREMENT_FUND') {
+    if (!String(paymentDetails.nationalId || '').trim() || !String(paymentDetails.salaryCard || '').trim()) {
+      throw new AppError(400, 'کد ملی و شماره کارت حقوقی الزامی است');
+    }
+  }
+
+  if (paymentMethod === 'SOCIAL_SECURITY') {
+    const hasPhone = String(paymentDetails.retireePhone || '').trim();
+    const hasCode = String(paymentDetails.otpCode || '').trim();
+    const verified = String(paymentDetails.otpVerified || '') === 'true';
+    if (!hasPhone || (!hasCode && !verified)) {
+      throw new AppError(400, 'شماره بازنشسته و کد تأیید الزامی است');
+    }
+  }
+
+  if (paymentMethod === 'TARA' && !String(paymentDetails.taraId || '').trim()) {
+    throw new AppError(400, 'شناسه خرید تارا الزامی است');
+  }
+}
+
+async function ensureCustomerUser(input: CreateOrderInput, existingUserId?: string) {
+  if (existingUserId) return existingUserId;
+
+  const phone = normalizePhone(input.customerPhone);
+  const parts = input.customerName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0];
+  const lastName = parts.slice(1).join(' ') || undefined;
+
+  const user = await prisma.user.upsert({
+    where: { phone },
+    update: {
+      ...(firstName ? { firstName } : {}),
+      ...(lastName ? { lastName } : {}),
+    },
+    create: {
+      phone,
+      firstName,
+      lastName,
+      role: 'CUSTOMER',
+    },
+  });
+
+  return user.id;
 }
 
 export class OrderService {
@@ -85,6 +131,24 @@ export class OrderService {
     }
 
     validatePaymentDetails(input.paymentMethod, input.paymentDetails);
+
+    if (input.paymentMethod === 'SOCIAL_SECURITY' && input.paymentDetails?.otpCode) {
+      await authService.confirmOtp(
+        String(input.paymentDetails.retireePhone),
+        String(input.paymentDetails.otpCode)
+      );
+    }
+
+    const resolvedUserId = await ensureCustomerUser(input, userId);
+
+    const paymentDetailsToStore = input.paymentDetails
+      ? Object.fromEntries(
+          Object.entries(input.paymentDetails).filter(([key]) => key !== 'otpCode')
+        )
+      : undefined;
+    if (paymentDetailsToStore && input.paymentMethod === 'SOCIAL_SECURITY') {
+      paymentDetailsToStore.otpVerified = 'true';
+    }
 
     const subtotal = cart.totalPrice;
     let discountAmount = 0;
@@ -136,7 +200,7 @@ export class OrderService {
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
-          userId: userId ?? null,
+          userId: resolvedUserId,
           subtotal,
           discountAmount,
           totalPrice,
@@ -144,8 +208,8 @@ export class OrderService {
           couponId: couponId ?? null,
           status: initialStatus,
           paymentMethod: input.paymentMethod,
-          paymentDetails: input.paymentDetails
-            ? (input.paymentDetails as Prisma.InputJsonValue)
+          paymentDetails: paymentDetailsToStore
+            ? (paymentDetailsToStore as Prisma.InputJsonValue)
             : undefined,
           customerName: input.customerName,
           customerPhone: input.customerPhone,
@@ -190,18 +254,19 @@ export class OrderService {
         });
       }
 
-      if (userId) {
-        await tx.cartItem.deleteMany({ where: { cart: { userId } } });
-      } else if (sessionId) {
+      if (resolvedUserId) {
+        await tx.cartItem.deleteMany({ where: { cart: { userId: resolvedUserId } } });
+      }
+      if (sessionId) {
         await tx.cartItem.deleteMany({ where: { cart: { sessionId } } });
       }
 
       return newOrder;
     });
 
-    if (userId) {
+    if (resolvedUserId) {
       await notificationService.notifyOrderStatusChange({
-        userId,
+        userId: resolvedUserId,
         orderId: order.id,
         orderNumber: order.orderNumber,
         status: initialStatus,
@@ -343,6 +408,10 @@ export class OrderService {
 
     if (!order) throw new AppError(404, 'سفارش یافت نشد');
 
+    if (status === 'PREPARING') {
+      await smsService.sendOrderPacked(order.customerPhone, order.orderNumber);
+    }
+
     if (status === 'SHIPPED') {
       await smsService.sendOrderShipped(order.customerPhone, order.orderNumber);
     }
@@ -362,7 +431,11 @@ export class OrderService {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new AppError(404, 'سفارش یافت نشد');
 
-    await smsService.sendOrderShipped(order.customerPhone, order.orderNumber);
+    if (order.status === 'PREPARING') {
+      await smsService.sendOrderPacked(order.customerPhone, order.orderNumber);
+    } else {
+      await smsService.sendOrderShipped(order.customerPhone, order.orderNumber);
+    }
     return { sent: true, orderNumber: order.orderNumber };
   }
 

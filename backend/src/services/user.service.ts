@@ -111,6 +111,11 @@ export class CustomerService {
           customerGroupId: true,
           customerGroup: { select: { id: true, name: true } },
           createdAt: true,
+          addresses: {
+            orderBy: { isDefault: 'desc' },
+            take: 1,
+            select: { address: true },
+          },
           _count: { select: { orders: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -120,8 +125,42 @@ export class CustomerService {
       prisma.user.count({ where }),
     ]);
 
+    const ids = customers.map((c) => c.id);
+    const spends = ids.length
+      ? await prisma.order.groupBy({
+          by: ['userId'],
+          where: { userId: { in: ids }, status: { not: 'CANCELLED' } },
+          _sum: { totalPrice: true },
+        })
+      : [];
+    const spendMap = new Map(spends.map((s) => [s.userId, Number(s._sum.totalPrice ?? 0)]));
+
+    const lastOrders = ids.length
+      ? await prisma.order.findMany({
+          where: { userId: { in: ids } },
+          orderBy: { createdAt: 'desc' },
+          select: { userId: true, createdAt: true, deliveryAddress: true, paymentMethod: true },
+          take: 400,
+        })
+      : [];
+    const lastOrderMap = new Map<string, (typeof lastOrders)[number]>();
+    for (const order of lastOrders) {
+      if (order.userId && !lastOrderMap.has(order.userId)) {
+        lastOrderMap.set(order.userId, order);
+      }
+    }
+
     return {
-      customers,
+      customers: customers.map((customer) => {
+        const last = lastOrderMap.get(customer.id);
+        return {
+          ...customer,
+          address: customer.addresses[0]?.address || last?.deliveryAddress || null,
+          totalSpend: spendMap.get(customer.id) ?? 0,
+          lastOrderAt: last?.createdAt ?? null,
+          lastPaymentMethod: last?.paymentMethod ?? null,
+        };
+      }),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -175,9 +214,13 @@ export class CustomerService {
     });
   }
 
-  async exportPhonesCsv(role: 'CUSTOMER' | 'ADMIN' = 'CUSTOMER') {
+  async exportPhonesCsv(options?: { customerGroupId?: string; paymentMethod?: string }) {
+    const where: Record<string, unknown> = { role: 'CUSTOMER', isActive: true };
+    if (options?.customerGroupId) where.customerGroupId = options.customerGroupId;
+    if (options?.paymentMethod) where.orders = { some: { paymentMethod: options.paymentMethod } };
+
     const users = await prisma.user.findMany({
-      where: { role, isActive: true },
+      where,
       select: { phone: true, firstName: true, lastName: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -191,14 +234,23 @@ export class CustomerService {
     return [header, ...rows].join('\n');
   }
 
-  async broadcastSms(message: string, role: 'CUSTOMER' | 'ADMIN' = 'CUSTOMER') {
+  async broadcastSms(
+    message: string,
+    options?: { customerGroupId?: string; paymentMethod?: string }
+  ) {
+    if (!message?.trim()) throw new AppError(400, 'متن پیام الزامی است');
+
+    const where: Record<string, unknown> = { role: 'CUSTOMER', isActive: true };
+    if (options?.customerGroupId) where.customerGroupId = options.customerGroupId;
+    if (options?.paymentMethod) where.orders = { some: { paymentMethod: options.paymentMethod } };
+
     const users = await prisma.user.findMany({
-      where: { role, isActive: true },
+      where,
       select: { phone: true },
     });
 
     const recipients = users.map((u) => u.phone);
-    return smsService.broadcast(recipients, message);
+    return smsService.broadcast(recipients, message.trim());
   }
 
   async getById(id: string) {
@@ -224,7 +276,16 @@ export class CustomerService {
       },
     });
     if (!customer) throw new AppError(404, 'کاربر یافت نشد');
-    return customer;
+
+    const spend = await prisma.order.aggregate({
+      where: { userId: id, status: { not: 'CANCELLED' } },
+      _sum: { totalPrice: true },
+    });
+
+    return {
+      ...customer,
+      totalSpend: Number(spend._sum.totalPrice ?? 0),
+    };
   }
 
   async getFrequentCustomers(limit = 10) {
@@ -275,8 +336,16 @@ export class AdminUserService {
     });
   }
 
-  async createAdmin(data: { phone: string; firstName?: string; lastName?: string }) {
+  async createAdmin(data: {
+    phone: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+  }) {
     const phone = normalizePhone(data.phone);
+    const passwordHash = data.password
+      ? await (await import('bcryptjs')).default.hash(data.password, 10)
+      : undefined;
 
     const user = await prisma.user.upsert({
       where: { phone },
@@ -285,12 +354,14 @@ export class AdminUserService {
         firstName: data.firstName ?? undefined,
         lastName: data.lastName ?? undefined,
         isActive: true,
+        ...(passwordHash ? { passwordHash } : {}),
       },
       create: {
         phone,
         role: 'ADMIN',
         firstName: data.firstName ?? 'ادمین',
         lastName: data.lastName ?? 'سیستم',
+        ...(passwordHash ? { passwordHash } : {}),
       },
       select: {
         id: true,

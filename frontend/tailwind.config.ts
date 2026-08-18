@@ -23,7 +23,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Vazirmatn', 'Tahoma', 'sans-serif'],
+        sans: ['IRANSansX', 'Tahoma', 'sans-serif'],
       },
       borderRadius: {
         'xl': '12px',

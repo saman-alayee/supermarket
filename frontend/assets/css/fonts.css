@@ -1,0 +1,71 @@
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Thin.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-UltraLight.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Light.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Medium.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-DemiBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-ExtraBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'IRANSansX';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url('../fonts/IRANSansXFaNum-Black.ttf') format('truetype');
+}

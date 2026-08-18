@@ -10,6 +10,13 @@ export default defineNuxtConfig({
     '@nuxt/icon',
   ],
 
+  // Keep URLs without trailing slash (matches links + avoids nginx dir redirects)
+  router: {
+    options: {
+      strict: false,
+    },
+  },
+
   app: {
     head: {
       htmlAttrs: { lang: 'fa', dir: 'rtl' },
@@ -29,8 +36,8 @@ export default defineNuxtConfig({
         },
       ],
       link: [
-        { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' },
-        { rel: 'apple-touch-icon', href: '/logo.svg' },
+        { rel: 'icon', type: 'image/png', href: '/logo.png' },
+        { rel: 'apple-touch-icon', href: '/logo.png' },
       ],
     },
   },
@@ -48,7 +55,20 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: '/api',
+      // Local: set NUXT_PUBLIC_API_BASE in .env (http://localhost:3001/api)
+      // Production: usually /api behind nginx
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3001/api',
+    },
+  },
+
+  vite: {
+    server: {
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+        },
+      },
     },
   },
 
@@ -66,19 +86,18 @@ export default defineNuxtConfig({
       dir: 'rtl',
       start_url: '/',
       icons: [
-        { src: '/logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-        { src: '/logo.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
+        { src: '/logo.png', sizes: 'any', type: 'image/png', purpose: 'any' },
+        { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     },
     workbox: {
       navigateFallback: '/',
-      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+      navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
+      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,ttf}'],
+      maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      cleanupOutdatedCaches: true,
+      clientsClaim: true,
       runtimeCaching: [
-        {
-          urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-          handler: 'CacheFirst',
-          options: { cacheName: 'google-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
-        },
         {
           urlPattern: /\/api\/(categories|products)/,
           handler: 'NetworkFirst',

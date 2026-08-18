@@ -28,6 +28,7 @@ router.get(
       categoryId,
       category,
       tagId,
+      ids,
       search,
       featured,
       discounted,
@@ -36,16 +37,21 @@ router.get(
       limit,
     } = req.query;
 
+    const idList = typeof ids === 'string'
+      ? ids.split(',').map((id) => id.trim()).filter(Boolean)
+      : undefined;
+
     const result = await productService.getAll({
       categoryId: categoryId as string,
       categorySlug: category as string,
-      tagId: tagId as string || (req.query.tag as string),
+      tagId: (tagId as string) || (req.query.tag as string),
+      ids: idList,
       search: search as string,
       featured: featured === 'true',
       discounted: discounted === 'true',
       isNew: isNew === 'true',
       page: page ? parseInt(page as string) : 1,
-      limit: limit ? parseInt(limit as string) : 20,
+      limit: limit ? parseInt(limit as string) : idList?.length || 20,
     });
     successResponse(res, result);
   })

@@ -115,7 +115,7 @@ useHead({ title: 'جزئیات سفارش - KIAA KALA' });
               <img
                 :src="getProductImage(item.product?.image ?? null)"
                 :alt="item.name"
-                class="w-full h-full object-contain p-1"
+                class="w-full h-full object-cover"
               />
             </div>
             <div class="flex-1 min-w-0">

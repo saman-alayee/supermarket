@@ -12,9 +12,16 @@ const overview = ref<{
   totalRevenue: number;
   orderCount: number;
   avgOrder: number;
+  avgPerCustomer: number;
+  uniqueCustomers: number;
   daily: { date: string; revenue: number; orders: number }[];
+  workingDays: { date: string; revenue: number; orders: number }[];
   byPayment: { paymentMethod: PaymentMethod; orderCount: number; totalRevenue: number }[];
   topProducts: { name: string; totalQuantity: number }[];
+  monthly: {
+    monthly: { month: string; revenue: number; orders: number }[];
+    changePercent: number | null;
+  };
 } | null>(null);
 
 async function load() {
@@ -30,8 +37,14 @@ async function load() {
 onMounted(load);
 watch(days, load);
 
-const maxDaily = computed(() =>
-  Math.max(...(overview.value?.daily.map((d) => d.revenue) || [1]), 1)
+const maxDaily = computed(() => {
+  const rows = overview.value?.workingDays?.length
+    ? overview.value.workingDays
+    : overview.value?.daily || [];
+  return Math.max(...rows.map((d) => d.revenue), 1);
+});
+const maxMonthly = computed(() =>
+  Math.max(...(overview.value?.monthly?.monthly.map((m) => m.revenue) || [1]), 1)
 );
 
 useHead({ title: 'گزارش فروش - پنل مدیریت' });
@@ -68,6 +81,10 @@ useHead({ title: 'گزارش فروش - پنل مدیریت' });
           <p class="text-lg font-bold mt-1">{{ formatPrice(overview.avgOrder) }}</p>
         </div>
         <div class="card p-4">
+          <p class="text-xs text-gray-500">میانگین هر مشتری</p>
+          <p class="text-lg font-bold mt-1">{{ formatPrice(overview.avgPerCustomer || 0) }}</p>
+        </div>
+        <div class="card p-4">
           <p class="text-xs text-gray-500">روش‌های پرداخت</p>
           <p class="text-lg font-bold mt-1">{{ formatNumber(overview.byPayment.length) }}</p>
         </div>
@@ -75,9 +92,9 @@ useHead({ title: 'گزارش فروش - پنل مدیریت' });
 
       <div class="grid lg:grid-cols-2 gap-4 mb-6">
         <div class="card p-4">
-          <h2 class="font-semibold mb-4">فروش روزانه</h2>
+          <h2 class="font-semibold mb-4">فروش روزهای کاری (به‌جز جمعه)</h2>
           <div class="space-y-2 max-h-72 overflow-y-auto">
-            <div v-for="day in overview.daily.slice().reverse()" :key="day.date" class="flex items-center gap-3">
+            <div v-for="day in (overview.workingDays || overview.daily).slice().reverse()" :key="day.date" class="flex items-center gap-3">
               <span class="text-xs text-gray-500 w-20 shrink-0" dir="ltr">{{ day.date.slice(5) }}</span>
               <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -97,6 +114,30 @@ useHead({ title: 'گزارش فروش - پنل مدیریت' });
               <span>{{ PAYMENT_METHOD_LABELS[row.paymentMethod] }}</span>
               <span class="font-medium">{{ formatPrice(row.totalRevenue) }} ({{ row.orderCount }})</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="overview.monthly?.monthly?.length" class="card p-4 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-semibold">فروش ماهانه</h2>
+          <span v-if="overview.monthly.changePercent != null" class="text-sm text-gray-500">
+            نسبت به ماه قبل:
+            <b :class="overview.monthly.changePercent >= 0 ? 'text-green-600' : 'text-red-500'">
+              {{ overview.monthly.changePercent }}٪
+            </b>
+          </span>
+        </div>
+        <div class="space-y-2">
+          <div v-for="row in overview.monthly.monthly" :key="row.month" class="flex items-center gap-3">
+            <span class="text-xs text-gray-500 w-16 shrink-0" dir="ltr">{{ row.month.slice(5) }}</span>
+            <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-accent-500 rounded-full"
+                :style="{ width: `${Math.round((row.revenue / maxMonthly) * 100)}%` }"
+              />
+            </div>
+            <span class="text-xs font-medium w-28 text-end">{{ formatPrice(row.revenue) }}</span>
           </div>
         </div>
       </div>

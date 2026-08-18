@@ -15,27 +15,15 @@ withDefaults(
 
 const { getCategoryImage } = useFormat();
 
-const categoryColors: Record<string, string> = {
-  labaniat: 'bg-blue-50',
-  noshedani: 'bg-cyan-50',
-  tangholat: 'bg-orange-50',
-  'mavad-ghazaei': 'bg-yellow-50',
-  'mive-sabzi': 'bg-green-50',
-  shoyandeha: 'bg-purple-50',
-  'mahsulat-khane': 'bg-pink-50',
-};
-
 const sizeClasses = {
   md: {
-    wrap: 'min-w-[80px]',
-    box: 'w-16 h-16 rounded-2xl',
-    img: 'w-11 h-11',
+    wrap: 'min-w-[72px]',
+    box: 'w-[72px] h-[72px] rounded-2xl',
     text: 'text-xs',
   },
   lg: {
-    wrap: 'min-w-[96px]',
-    box: 'w-24 h-24 rounded-3xl',
-    img: 'w-16 h-16',
+    wrap: 'min-w-[88px]',
+    box: 'w-[88px] h-[88px] rounded-2xl',
     text: 'text-sm',
   },
 };
@@ -44,23 +32,22 @@ const sizeClasses = {
 <template>
   <NuxtLink
     :to="`/categories/${category.slug}`"
-    :class="['flex flex-col items-center gap-2.5 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
+    :class="['flex flex-col items-center gap-2 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
   >
     <div
       :class="[
         sizeClasses[size].box,
-        'flex items-center justify-center transition-transform shadow-sm',
-        categoryColors[category.slug] || 'bg-gray-50',
-        active ? 'ring-2 ring-primary-400 ring-offset-2' : 'group-hover:scale-105 group-active:scale-95',
+        'overflow-hidden transition-transform',
+        active ? 'ring-2 ring-primary-400' : 'group-hover:scale-105 group-active:scale-95',
       ]"
     >
       <img
         v-if="category.image"
         :src="getCategoryImage(category.image)"
         :alt="category.name"
-        :class="[sizeClasses[size].img, 'object-contain']"
+        class="w-full h-full object-cover"
       />
-      <span v-else class="text-3xl">🛒</span>
+      <span v-else class="w-full h-full flex items-center justify-center bg-gray-50 text-3xl">🛒</span>
     </div>
     <span
       :class="[

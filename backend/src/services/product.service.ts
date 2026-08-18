@@ -7,6 +7,7 @@ interface ProductFilters {
   categoryId?: string;
   categorySlug?: string;
   tagId?: string;
+  ids?: string[];
   search?: string;
   featured?: boolean;
   discounted?: boolean;
@@ -39,6 +40,7 @@ export class ProductService {
       categoryId,
       categorySlug,
       tagId,
+      ids,
       search,
       featured,
       discounted,
@@ -53,6 +55,7 @@ export class ProductService {
     if (!includeInactive) where.isActive = true;
     if (categoryId) where.categoryId = categoryId;
     if (tagId) where.tagId = tagId;
+    if (ids?.length) where.id = { in: ids };
     if (categorySlug) {
       where.category = { slug: categorySlug };
     }
@@ -60,14 +63,19 @@ export class ProductService {
     if (isNew) where.isNew = true;
     if (discounted) where.discountPrice = { not: null };
     if (search) {
-      const term = search.trim();
-      if (term) {
-        where.OR = [
+      const terms = search
+        .trim()
+        .split(/\s+/)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 1);
+      if (terms.length) {
+        where.OR = terms.flatMap((term) => [
           { name: textContains(term) },
           { description: textContains(term) },
+          { slug: textContains(term) },
           { category: { name: textContains(term) } },
           { tag: { name: textContains(term) } },
-        ];
+        ]);
       }
     }
 
@@ -273,36 +281,48 @@ export class ProductService {
 
     const groups = await Promise.all(
       tags.map(async (tag) => {
-        const products = await prisma.product.findMany({
-          where: { tagId: tag.id, isActive: true },
-          include: productInclude,
-          orderBy: { createdAt: 'desc' },
-        });
+        const where = { tagId: tag.id, isActive: true };
+        const [products, total] = await Promise.all([
+          prisma.product.findMany({
+            where,
+            include: productInclude,
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+          }),
+          prisma.product.count({ where }),
+        ]);
         return {
           tag,
+          total,
           products: products.map((p) => this.formatProduct(p)),
         };
       })
     );
 
-    const untagged = await prisma.product.findMany({
-      where: { categoryId: category.id, tagId: null, isActive: true },
-      include: productInclude,
-      orderBy: { createdAt: 'desc' },
-    });
+    const untaggedWhere = { categoryId: category.id, tagId: null, isActive: true };
+    const [untagged, untaggedTotal] = await Promise.all([
+      prisma.product.findMany({
+        where: untaggedWhere,
+        include: productInclude,
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+      }),
+      prisma.product.count({ where: untaggedWhere }),
+    ]);
 
-    if (untagged.length) {
+    if (untaggedTotal) {
       groups.push({
         tag: {
           id: 'other',
           categoryId: category.id,
-          name: 'سایر',
+          name: 'سایر محصولات',
           slug: 'other',
           icon: null,
           sortOrder: 999,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
+        total: untaggedTotal,
         products: untagged.map((p) => this.formatProduct(p)),
       });
     }

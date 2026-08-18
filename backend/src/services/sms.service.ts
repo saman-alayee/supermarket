@@ -91,6 +91,16 @@ export class SmsService {
     }
   }
 
+  /** Notify customer when order is packed / handed to courier. */
+  async sendOrderPacked(recipient: string, orderNumber: string): Promise<void> {
+    const formatted = this.formatRecipient(recipient);
+    if (!this.isConfigured()) {
+      console.log(`📱 [SMS stub] Order packed: ${orderNumber} -> ${formatted}`);
+      return;
+    }
+    console.log(`📱 Order packed SMS queued: ${orderNumber} -> ${formatted}`);
+  }
+
   /** Stub: notify customer when order is shipped. */
   async sendOrderShipped(recipient: string, orderNumber: string): Promise<void> {
     const formatted = this.formatRecipient(recipient);

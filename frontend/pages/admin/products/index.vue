@@ -175,41 +175,86 @@ useHead({ title: 'محصولات - پنل مدیریت' });
     <div v-if="showForm" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" @click.self="showForm = false">
       <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
         <h2 class="text-lg font-bold mb-4">{{ editingId ? 'ویرایش محصول' : 'افزودن محصول' }}</h2>
-        <form class="space-y-3" @submit.prevent="save">
+        <form class="space-y-4" @submit.prevent="save">
           <AppImagesUpload
             v-model="form.images"
             upload-endpoint="/admin/products/upload"
             label="تصاویر محصول"
             hint="JPEG, PNG, WebP یا GIF — حداکثر ۵ مگابایت"
           />
-          <input v-model="form.name" required placeholder="نام محصول" class="input-field" />
-          <textarea v-model="form.description" placeholder="توضیحات" rows="2" class="input-field resize-none" />
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">نام محصول</label>
+            <input v-model="form.name" required placeholder="مثلاً شیر کم‌چرب ۱ لیتر" class="input-field" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">توضیحات</label>
+            <textarea
+              v-model="form.description"
+              placeholder="توضیحات کوتاه محصول"
+              rows="3"
+              class="input-field resize-none"
+            />
+          </div>
+
           <div class="grid grid-cols-2 gap-3">
-            <input v-model.number="form.price" type="number" required placeholder="قیمت (تومان)" class="input-field" />
-            <input v-model.number="form.discountPrice" type="number" placeholder="قیمت تخفیفی" class="input-field" />
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">قیمت (تومان)</label>
+              <input v-model.number="form.price" type="number" min="0" required class="input-field" dir="ltr" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">قیمت با تخفیف</label>
+              <input
+                v-model.number="form.discountPrice"
+                type="number"
+                min="0"
+                placeholder="اختیاری"
+                class="input-field"
+                dir="ltr"
+              />
+            </div>
           </div>
+
           <div class="grid grid-cols-2 gap-3">
-            <input v-model.number="form.stock" type="number" required placeholder="موجودی" class="input-field" />
-            <input v-model="form.unit" placeholder="واحد (مثلا ۱ لیتر)" class="input-field" />
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">موجودی انبار</label>
+              <input v-model.number="form.stock" type="number" min="0" required class="input-field" dir="ltr" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">واحد فروش</label>
+              <input v-model="form.unit" placeholder="مثلاً ۱ لیتر / بسته" class="input-field" />
+            </div>
           </div>
-          <AppSelect
-            v-model="form.categoryId"
-            :options="categoryOptions"
-            placeholder="دسته‌بندی را انتخاب کنید"
-            searchable
-            required
-          />
-          <AppSelect
-            v-model="form.tagId"
-            :options="tagOptions"
-            placeholder="برچسب (اختیاری)"
-            searchable
-          />
-          <div class="flex flex-wrap gap-2">
-            <AppToggleChip v-model="form.isFeatured" label="ویژه" icon="lucide:sparkles" />
-            <AppToggleChip v-model="form.isNew" label="جدید" icon="lucide:badge-plus" />
-            <AppToggleChip v-model="form.isActive" label="فعال" icon="lucide:eye" />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">دسته‌بندی</label>
+            <AppSelect
+              v-model="form.categoryId"
+              :options="categoryOptions"
+              placeholder="دسته‌بندی را انتخاب کنید"
+              searchable
+              required
+            />
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">برچسب</label>
+            <AppSelect
+              v-model="form.tagId"
+              :options="tagOptions"
+              placeholder="برچسب (اختیاری)"
+              searchable
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">وضعیت نمایش</label>
+            <div class="flex flex-wrap gap-2">
+              <AppToggleChip v-model="form.isFeatured" label="ویژه" icon="lucide:sparkles" />
+              <AppToggleChip v-model="form.isNew" label="جدید" icon="lucide:badge-plus" />
+              <AppToggleChip v-model="form.isActive" label="فعال" icon="lucide:eye" />
+            </div>
+          </div>
+
           <button type="submit" class="btn-primary w-full">ذخیره</button>
         </form>
       </div>

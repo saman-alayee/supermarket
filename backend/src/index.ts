@@ -25,6 +25,11 @@ import favoriteRoutes from './routes/favorite.routes';
 
 const app = express();
 
+// Needed when behind nginx / reverse proxy (avoids rate-limit false positives)
+if (config.nodeEnv === 'production') {
+  app.set('trust proxy', 1);
+}
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 function isAllowedCorsOrigin(origin: string | undefined): boolean {
   if (!origin) return true;

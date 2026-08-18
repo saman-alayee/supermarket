@@ -26,7 +26,7 @@ useHead({ title: 'سبد خرید - هایپرمارکت' });
           <img
             :src="getProductImage(item.image)"
             :alt="item.name"
-            class="w-16 h-16 object-contain bg-gray-50 rounded-xl"
+            class="w-16 h-16 object-cover shrink-0"
           />
           <div class="flex-1 min-w-0">
             <h3 class="text-sm font-medium text-gray-800 truncate">{{ item.name }}</h3>

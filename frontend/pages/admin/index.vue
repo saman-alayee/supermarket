@@ -26,7 +26,7 @@ const quickLinks = [
   { to: '/admin/orders?status=PREPARING', label: 'در حال آماده‌سازی', desc: 'آماده برای ارسال', icon: 'lucide:chef-hat' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', desc: 'مدیریت پرومو', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران و ادمین', desc: 'نقش‌ها و دسترسی', icon: 'lucide:users' },
-  { to: '/admin/content', label: 'قوانین و محتوا', desc: 'ویرایش صفحات', icon: 'lucide:file-text' },
+  { to: '/admin/content', label: 'قوانین و مقررات', desc: 'ویرایش متن قوانین سایت', icon: 'lucide:file-text' },
 ];
 
 useHead({ title: 'داشبورد - پنل مدیریت' });

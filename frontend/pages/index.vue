@@ -66,7 +66,7 @@ useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
     <PromoSlider v-if="topSliders?.length" :sliders="topSliders" />
 
     <section v-if="categories?.length" class="px-4 py-5">
-      <div class="flex gap-4 overflow-x-auto scrollbar-hide pb-1">
+      <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
         <CategoryCard
           v-for="category in categories"
           :key="category.id"

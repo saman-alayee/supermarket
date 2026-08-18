@@ -28,6 +28,11 @@ const mapLat = ref<number | null>(null);
 const mapLng = ref<number | null>(null);
 
 const loading = ref(false);
+const otpSending = ref(false);
+const otpVerified = ref(false);
+const otpDevCode = ref('');
+const retireePhone = ref('');
+const retireeOtp = ref('');
 const error = ref('');
 const couponLoading = ref(false);
 const addressesLoading = ref(false);
@@ -43,7 +48,7 @@ const appliedCoupon = ref<{
 const paymentOptions: { value: PaymentMethod; label: string; hint?: string }[] = [
   { value: 'CASH_AT_DOOR', label: PAYMENT_METHOD_LABELS.CASH_AT_DOOR },
   { value: 'RETIREMENT_FUND', label: PAYMENT_METHOD_LABELS.RETIREMENT_FUND, hint: 'کد ملی + شماره کارت حقوقی' },
-  { value: 'SOCIAL_SECURITY', label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY, hint: 'کد به موبایل بازنشسته' },
+  { value: 'SOCIAL_SECURITY', label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY, hint: 'ارسال کد به موبایل بازنشسته' },
   { value: 'TARA', label: PAYMENT_METHOD_LABELS.TARA, hint: 'شناسه خرید تارا' },
   { value: 'OTHER_WALLET', label: PAYMENT_METHOD_LABELS.OTHER_WALLET, hint: 'نوع کیف پول در توضیحات' },
 ];
@@ -117,6 +122,11 @@ function buildPaymentDetails(): Record<string, string> | undefined {
     details.nationalId = form.nationalId.trim();
     details.salaryCard = form.salaryCard.trim();
   }
+  if (form.paymentMethod === 'SOCIAL_SECURITY') {
+    details.retireePhone = retireePhone.value.trim() || form.customerPhone.trim();
+    if (otpVerified.value) details.otpVerified = 'true';
+    else details.otpCode = retireeOtp.value.trim();
+  }
   if (form.paymentMethod === 'TARA') {
     details.taraId = form.taraId.trim();
   }
@@ -124,6 +134,37 @@ function buildPaymentDetails(): Record<string, string> | undefined {
     details.walletNote = form.walletNote.trim();
   }
   return details;
+}
+
+async function sendSocialOtp() {
+  const phone = (retireePhone.value.trim() || form.customerPhone.trim());
+  if (!/^09\d{9}$/.test(phone)) {
+    error.value = 'شماره موبایل بازنشسته معتبر نیست';
+    return;
+  }
+  otpSending.value = true;
+  otpVerified.value = false;
+  try {
+    const { data } = await api.post<{ message: string; devCode?: string }>('/auth/send-otp', { phone });
+    otpDevCode.value = data.devCode || '';
+    toast.success('کد تأیید ارسال شد');
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'خطا در ارسال کد';
+  } finally {
+    otpSending.value = false;
+  }
+}
+
+async function confirmSocialOtp() {
+  const phone = retireePhone.value.trim() || form.customerPhone.trim();
+  try {
+    await api.post('/auth/confirm-otp', { phone, code: retireeOtp.value.trim() });
+    otpVerified.value = true;
+    toast.success('کد تأیید شد');
+  } catch (e: unknown) {
+    otpVerified.value = false;
+    error.value = e instanceof Error ? e.message : 'کد تأیید نامعتبر است';
+  }
 }
 
 async function submitOrder() {
@@ -169,6 +210,11 @@ async function submitOrder() {
   }
   if (form.paymentMethod === 'TARA' && !form.taraId.trim()) {
     error.value = 'شناسه خرید تارا را وارد کنید';
+    toast.error(error.value);
+    return;
+  }
+  if (form.paymentMethod === 'SOCIAL_SECURITY' && !otpVerified.value) {
+    error.value = 'ابتدا کد تأیید تامین اجتماعی را وارد کنید';
     toast.error(error.value);
     return;
   }
@@ -223,14 +269,14 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
         :class="['flex-1 py-2.5 text-sm font-medium rounded-lg', checkoutMode === 'quick' ? 'bg-white shadow text-primary-700' : 'text-gray-500']"
         @click="checkoutMode = 'quick'"
       >
-        خرید سریع
+        خرید سریع بدون ثبت‌نام
       </button>
       <button
         type="button"
         :class="['flex-1 py-2.5 text-sm font-medium rounded-lg', checkoutMode === 'account' ? 'bg-white shadow text-primary-700' : 'text-gray-500']"
         @click="switchToAccount"
       >
-        با حساب کاربری
+        ورود / ثبت‌نام
       </button>
     </div>
 
@@ -251,6 +297,10 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
           <AppMapPicker v-model:latitude="mapLat" v-model:longitude="mapLng" :geocode="false" height="220px" :zoom="16" />
           <AppFormError :message="addressErrors.map" />
         </div>
+        <p class="text-xs text-gray-500">
+          ثبت‌نام لازم نیست. در صورت تمایل می‌توانید
+          <button type="button" class="text-primary-600 font-medium" @click="switchToAccount">وارد حساب شوید</button>.
+        </p>
       </div>
 
       <div v-else class="space-y-3">
@@ -290,6 +340,30 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
         </div>
         <div v-if="form.paymentMethod === 'TARA'" class="pt-2">
           <input v-model="form.taraId" class="input-field" placeholder="شناسه خرید تارا" dir="ltr" />
+        </div>
+        <div v-if="form.paymentMethod === 'SOCIAL_SECURITY'" class="space-y-2 pt-2">
+          <input
+            v-model="retireePhone"
+            class="input-field"
+            placeholder="شماره همراه بازنشسته"
+            dir="ltr"
+          />
+          <div class="flex gap-2">
+            <input v-model="retireeOtp" class="input-field" placeholder="کد تأیید" dir="ltr" maxlength="6" />
+            <button type="button" class="btn-secondary shrink-0" :disabled="otpSending" @click="sendSocialOtp">
+              {{ otpSending ? '...' : 'ارسال کد' }}
+            </button>
+          </div>
+          <button
+            v-if="retireeOtp"
+            type="button"
+            class="btn-primary w-full text-sm"
+            :class="otpVerified ? 'opacity-70' : ''"
+            @click="confirmSocialOtp"
+          >
+            {{ otpVerified ? 'کد تأیید شد' : 'تأیید کد' }}
+          </button>
+          <p v-if="otpDevCode" class="text-xs text-amber-600">کد آزمایشی: {{ otpDevCode }}</p>
         </div>
         <div v-if="form.paymentMethod === 'OTHER_WALLET'" class="pt-2">
           <input v-model="form.walletNote" class="input-field" placeholder="نوع کیف پول" />

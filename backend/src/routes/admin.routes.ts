@@ -212,11 +212,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const result = await customerService.getAll(
       req.query.page ? parseInt(req.query.page as string) : 1,
-      req.query.limit ? parseInt(req.query.limit as string) : 20,
+      req.query.limit ? parseInt(req.query.limit as string) : 100,
       req.query.search as string,
       'CUSTOMER',
       req.query.paymentMethod as string,
-      req.query.customerGroupId as string
+      (req.query.customerGroupId as string) || (req.query.groupId as string)
     );
     successResponse(res, result);
   })
@@ -232,8 +232,11 @@ router.post(
 
 router.get(
   '/customers/export-phones',
-  asyncHandler(async (_req, res) => {
-    const csv = await customerService.exportPhonesCsv('CUSTOMER');
+  asyncHandler(async (req, res) => {
+    const csv = await customerService.exportPhonesCsv({
+      customerGroupId: (req.query.customerGroupId as string) || (req.query.groupId as string),
+      paymentMethod: req.query.paymentMethod as string,
+    });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="customer-phones.csv"');
     res.send('\uFEFF' + csv);
@@ -243,8 +246,8 @@ router.get(
 router.post(
   '/customers/broadcast-sms',
   asyncHandler(async (req, res) => {
-    const { message } = req.body;
-    const result = await customerService.broadcastSms(message, 'CUSTOMER');
+    const { message, customerGroupId, paymentMethod } = req.body;
+    const result = await customerService.broadcastSms(message, { customerGroupId, paymentMethod });
     successResponse(res, result, 'پیامک‌ها در صف ارسال قرار گرفت');
   })
 );
@@ -275,6 +278,14 @@ router.get(
 
 router.post(
   '/users/admin',
+  validate(
+    z.object({
+      phone: z.string().min(10),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      password: z.string().min(6).optional(),
+    })
+  ),
   asyncHandler(async (req, res) => {
     const user = await adminUserService.createAdmin(req.body);
     successResponse(res, user, 'ادمین جدید اضافه شد', 201);

@@ -17,12 +17,12 @@ function handleSearch() {
 <template>
   <header class="sticky top-0 z-50 bg-white border-b border-gray-100">
     <div class="max-w-7xl mx-auto px-4">
-      <div class="flex items-center justify-between h-14 md:h-16">
+      <div class="flex items-center justify-between h-16 md:h-[4.5rem]">
         <button class="md:hidden p-2 -ms-2 text-gray-600" @click="showSearch = !showSearch">
           <AppIcon name="lucide:search" size="lg" />
         </button>
 
-        <AppLogo size="md" />
+        <AppLogo size="lg" />
 
         <div class="hidden md:flex flex-1 max-w-xl mx-8">
           <form class="w-full relative" @submit.prevent="handleSearch">

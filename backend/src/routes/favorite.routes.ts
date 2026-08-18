@@ -30,6 +30,16 @@ router.post(
   })
 );
 
+router.post(
+  '/sync',
+  authenticate,
+  validate(z.object({ productIds: z.array(z.string().min(1)).max(100) })),
+  asyncHandler(async (req, res) => {
+    const favorites = await favoriteService.sync(req.user!.userId, req.body.productIds);
+    successResponse(res, favorites);
+  })
+);
+
 router.delete(
   '/:productId',
   authenticate,

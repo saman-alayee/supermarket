@@ -24,7 +24,7 @@ async function loadSearch() {
   loading.value = true;
   try {
     const { data } = await api.get<{ products: Product[] }>(
-      `/products?search=${encodeURIComponent(term)}&limit=30`
+      `/products?search=${encodeURIComponent(term)}&limit=50`
     );
     products.value = data.products;
   } catch {
@@ -80,7 +80,7 @@ useHead(() => ({
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading && products.length" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-if="!loading && products.length" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
       <ProductCard v-for="product in products" :key="product.id" :product="product" />
     </div>
 

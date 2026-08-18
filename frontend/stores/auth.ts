@@ -139,6 +139,36 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loginAdminWithPassword(phone: string, password: string) {
+    loading.value = true;
+    try {
+      const api = useApi();
+      const { data } = await api.post<{ token: string; user: User }>('/auth/admin/login-password', {
+        phone: normalizePhoneInput(phone),
+        password,
+      });
+      setAuth(data.token, data.user);
+      return data;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function verifyAdminOtp(phone: string, code: string) {
+    loading.value = true;
+    try {
+      const api = useApi();
+      const { data } = await api.post<{ token: string; user: User }>('/auth/admin/verify-otp', {
+        phone: normalizePhoneInput(phone),
+        code: normalizeDigits(code),
+      });
+      setAuth(data.token, data.user);
+      return data;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function fetchProfile() {
     const api = useApi();
     const { data } = await api.get<User>('/auth/profile');
@@ -168,6 +198,8 @@ export const useAuthStore = defineStore('auth', () => {
     sendOtp,
     verifyOtp,
     loginWithPassword,
+    loginAdminWithPassword,
+    verifyAdminOtp,
     fetchProfile,
     updateProfile,
   };

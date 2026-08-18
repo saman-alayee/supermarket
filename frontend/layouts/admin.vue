@@ -14,7 +14,7 @@ const navItems = [
   { to: '/admin/customers', label: 'مشتریان', icon: 'lucide:user-round' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران', icon: 'lucide:users' },
-  { to: '/admin/content', label: 'محتوا', icon: 'lucide:file-text' },
+  { to: '/admin/content', label: 'قوانین و مقررات', icon: 'lucide:file-text' },
 ];
 
 watch(() => route.path, () => {

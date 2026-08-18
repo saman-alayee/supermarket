@@ -30,8 +30,8 @@ const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
 const STATUS_HINTS: Partial<Record<OrderStatus, string>> = {
   REVIEWING: 'سفارش در انتظار تأیید روش پرداخت است',
   NEW: 'پرداخت تأیید شد — آماده آماده‌سازی',
-  SHIPPED: 'پیام «پیک ارسال شده» به کاربر ارسال می‌شود',
-  PREPARING: 'کاربر از آماده‌سازی سفارش مطلع می‌شود',
+  SHIPPED: 'پیام «تحویل به پیک» به مشتری ارسال می‌شود',
+  PREPARING: 'پیام «بسته‌بندی شد» به مشتری ارسال می‌شود',
   DELIVERED: 'سفارش تکمیل شد',
   CANCELLED: 'سفارش لغو می‌شود',
 };
@@ -85,6 +85,15 @@ async function updateStatus(orderId: string, status: OrderStatus) {
   } catch (e: unknown) {
     statusError.value = e instanceof Error ? e.message : 'خطا در تغییر وضعیت';
     toast.error(statusError.value);
+  }
+}
+
+async function sendOrderSms(orderId: string) {
+  try {
+    await api.post(`/admin/orders/${orderId}/send-sms`);
+    toast.success('پیامک ارسال شد');
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ارسال پیامک');
   }
 }
 
@@ -233,6 +242,14 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
             {{ STATUS_HINTS[status] }}
           </p>
         </div>
+
+        <button
+          v-if="selectedOrder.status === 'PREPARING' || selectedOrder.status === 'SHIPPED'"
+          class="btn-secondary w-full text-sm mt-3"
+          @click="sendOrderSms(selectedOrder.id)"
+        >
+          ارسال دوباره پیامک وضعیت
+        </button>
 
         <div v-if="selectedOrder.statusLogs?.length" class="mt-6 border-t pt-4">
           <p class="text-sm font-medium mb-2">تاریخچه</p>

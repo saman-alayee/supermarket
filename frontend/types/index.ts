@@ -22,7 +22,7 @@ export interface Tag {
   categoryId: string;
   icon: string | null;
   sortOrder: number;
-  isActive: boolean;
+  isActive?: boolean;
   category?: { id: string; name: string; slug: string };
   _count?: { products: number };
 }
@@ -94,6 +94,7 @@ export interface User {
   isActive?: boolean;
   customerGroupId?: string | null;
   customerGroup?: CustomerGroup | null;
+  hasPassword?: boolean;
 }
 
 export interface CustomerGroup {
@@ -230,8 +231,13 @@ export interface SalesStats {
 
 export interface AdminCustomer extends User {
   createdAt: string;
+  address?: string | null;
+  totalSpend?: number;
+  lastOrderAt?: string | null;
+  lastPaymentMethod?: PaymentMethod | null;
   _count: { orders: number };
   orders?: Order[];
+  addresses?: Address[];
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

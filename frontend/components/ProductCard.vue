@@ -46,11 +46,11 @@ async function handleDecrease() {
 </script>
 
 <template>
-  <div class="card group relative">
+  <div class="group relative bg-white border border-gray-100 overflow-hidden rounded-lg">
     <button
       type="button"
       :class="[
-        'absolute top-2 end-2 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm',
+        'absolute top-1 end-1 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm',
         favorited ? 'bg-red-50 text-red-500' : 'bg-white/90 text-gray-400 hover:text-red-400',
       ]"
       :disabled="favLoading"
@@ -66,80 +66,80 @@ async function handleDecrease() {
 
     <div
       v-if="product.discountPercent > 0"
-      class="absolute top-2 start-2 z-10 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg"
+      class="absolute top-1 start-1 z-10 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5"
     >
       {{ product.discountPercent }}٪
     </div>
 
     <div
       v-if="product.isNew"
-      class="absolute top-11 end-2 z-10 bg-accent-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg"
+      class="absolute top-8 end-1 z-10 bg-accent-500 text-white text-[9px] font-bold px-1 py-0.5"
     >
       جدید
     </div>
 
-    <NuxtLink :to="`/products/${product.slug}`" class="block aspect-square bg-gray-50 p-4">
+    <NuxtLink :to="`/products/${product.slug}`" class="block aspect-[5/4] overflow-hidden bg-gray-100">
       <img
         :src="getProductImage(product.image)"
         :alt="product.name"
-        class="w-full h-full object-contain"
+        class="w-full h-full object-cover"
         loading="lazy"
       />
     </NuxtLink>
 
-    <div class="p-3">
+    <div class="px-1.5 pt-1 pb-1.5">
       <NuxtLink :to="`/products/${product.slug}`">
-        <h3 class="font-medium text-sm text-gray-800 line-clamp-2 mb-1 min-h-[2.5rem]">
+        <h3 class="font-medium text-[11px] text-gray-800 line-clamp-2 leading-snug mb-0.5 min-h-[1.75rem]">
           {{ product.name }}
         </h3>
       </NuxtLink>
 
-      <p v-if="product.unit" class="text-xs text-gray-400 mb-2">{{ product.unit }}</p>
+      <p v-if="product.unit" class="text-[9px] text-gray-400 mb-1">{{ product.unit }}</p>
 
-      <div class="flex items-end justify-between">
-        <div>
-          <p v-if="product.discountPrice" class="text-xs text-gray-400 line-through">
+      <div class="flex items-end justify-between gap-0.5">
+        <div class="min-w-0">
+          <p v-if="product.discountPrice" class="text-[9px] text-gray-400 line-through leading-none mb-0.5">
             {{ formatPrice(product.price) }}
           </p>
-          <p class="text-sm font-bold text-gray-800">
+          <p class="text-[11px] font-bold text-gray-900 leading-tight">
             {{ formatPrice(product.effectivePrice) }}
           </p>
         </div>
 
-        <div v-if="!product.inStock" class="text-xs text-red-500 font-medium">
+        <div v-if="!product.inStock" class="text-[9px] text-red-500 font-medium shrink-0">
           ناموجود
         </div>
-        <div v-else-if="quantity === 0" class="relative">
+        <div v-else-if="quantity === 0" class="relative shrink-0">
           <button
-            class="w-10 h-10 bg-primary-600 text-white rounded-full flex items-center justify-center
-                   hover:bg-primary-700 active:scale-95 transition-all shadow-md"
+            class="w-7 h-7 bg-primary-600 text-white rounded-full flex items-center justify-center
+                   hover:bg-primary-700 active:scale-95 transition-all"
             :disabled="isAdding"
             @click.stop="handleAdd"
           >
-            <svg v-if="!isAdding" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg v-if="!isAdding" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
             </svg>
-            <svg v-else class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <svg v-else class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           </button>
         </div>
-        <div v-else class="flex items-center gap-1 bg-primary-50 rounded-full px-1">
+        <div v-else class="flex items-center bg-primary-50 shrink-0">
           <button
-            class="w-8 h-8 flex items-center justify-center text-primary-600 hover:bg-primary-100 rounded-full"
+            class="w-6 h-6 flex items-center justify-center text-primary-600 hover:bg-primary-100"
             @click.stop="handleDecrease"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4" />
             </svg>
           </button>
-          <span class="w-6 text-center text-sm font-bold text-primary-700">{{ quantity }}</span>
+          <span class="w-4 text-center text-[11px] font-bold text-primary-700">{{ quantity }}</span>
           <button
-            class="w-8 h-8 flex items-center justify-center text-primary-600 hover:bg-primary-100 rounded-full"
+            class="w-6 h-6 flex items-center justify-center text-primary-600 hover:bg-primary-100"
             @click.stop="handleIncrease"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
             </svg>
           </button>

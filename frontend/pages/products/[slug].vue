@@ -55,30 +55,39 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
 </script>
 
 <template>
-  <div v-if="product" class="pb-28">
-    <div class="relative bg-gray-50">
+  <div v-if="product" class="pb-28 max-w-lg mx-auto">
+    <div class="relative bg-white px-4 pt-4">
       <button
         type="button"
         :class="[
-          'absolute top-4 end-4 z-10 w-10 h-10 rounded-full flex items-center justify-center shadow-md',
-          favorited ? 'bg-red-50 text-red-500' : 'bg-white text-gray-400',
+          'absolute top-5 end-5 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm',
+          favorited ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400',
         ]"
         @click="toggleFavorite(product.id)"
       >
         <AppIcon name="lucide:heart" size="md" :class="favorited ? 'fill-current' : ''" />
       </button>
 
-      <div class="h-[42vh] max-h-[360px] flex items-center justify-center p-6">
-        <img
-          :src="getProductImage(activeImage)"
-          :alt="product.name"
-          class="max-h-full max-w-full object-contain"
-        />
+      <div class="flex items-start gap-4">
+        <div class="w-28 h-28 shrink-0 rounded-2xl bg-gray-50 overflow-hidden flex items-center justify-center">
+          <img
+            :src="getProductImage(activeImage)"
+            :alt="product.name"
+            class="w-full h-full object-contain p-2"
+          />
+        </div>
+        <div class="min-w-0 flex-1 pt-1">
+          <p v-if="product.tag?.name" class="text-xs text-primary-600 font-medium mb-1">
+            {{ product.tag.icon }} {{ product.tag.name }}
+          </p>
+          <h1 class="text-lg font-bold text-gray-800 leading-snug">{{ product.name }}</h1>
+          <p v-if="product.unit" class="text-xs text-gray-400 mt-1">{{ product.unit }}</p>
+        </div>
       </div>
 
       <div
         v-if="galleryImages.length > 1"
-        class="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3"
+        class="flex gap-2 overflow-x-auto scrollbar-hide pt-3"
       >
         <button
           v-for="(image, index) in galleryImages"
@@ -99,12 +108,7 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
       </div>
     </div>
 
-    <div class="px-4 py-5">
-      <p v-if="product.tag?.name" class="text-xs text-primary-600 font-medium mb-1">
-        {{ product.tag.name }}
-      </p>
-      <h1 class="text-xl font-bold text-gray-800 mb-2">{{ product.name }}</h1>
-      <p v-if="product.unit" class="text-sm text-gray-400 mb-3">{{ product.unit }}</p>
+    <div class="px-4 py-4">
       <p v-if="product.description" class="text-sm text-gray-600 mb-4 leading-relaxed">
         {{ product.description }}
       </p>
@@ -127,7 +131,9 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
     </div>
 
     <section v-if="relatedProducts.length" class="px-4 pb-4">
-      <h2 class="section-title">محصولات مرتبط</h2>
+      <h2 class="section-title">
+        {{ product.tag?.name ? `سایر ${product.tag.name}` : 'محصولات مرتبط' }}
+      </h2>
       <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
         <div
           v-for="item in relatedProducts"

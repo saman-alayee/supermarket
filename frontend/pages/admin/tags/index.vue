@@ -105,7 +105,7 @@ useHead({ title: 'برچسب‌ها - پنل مدیریت' });
         <select v-model="form.categoryId" required class="input-field">
           <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
         </select>
-        <input v-model="form.icon" class="input-field" placeholder="آیکن (emoji)" />
+        <input v-model="form.icon" class="input-field" placeholder="آیکن (emoji مثل 🥛)" />
         <input v-model.number="form.sortOrder" type="number" class="input-field" placeholder="ترتیب" />
         <div class="flex gap-2">
           <button type="submit" class="btn-primary flex-1">ذخیره</button>

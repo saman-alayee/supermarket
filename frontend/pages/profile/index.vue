@@ -45,6 +45,13 @@ const menuItems = [
     icon: 'lucide:user-cog',
     color: 'purple',
   },
+  {
+    to: '/profile/password',
+    label: 'رمز عبور',
+    desc: 'تعیین یا تغییر رمز ورود',
+    icon: 'lucide:key-round',
+    color: 'blue',
+  },
 ];
 
 const initials = computed(() => {

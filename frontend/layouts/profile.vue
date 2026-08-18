@@ -7,7 +7,7 @@ onMounted(() => {
   authStore.init();
   cartStore.fetchCart();
 
-  if (!authStore.isLoggedIn && route.path.startsWith('/profile')) {
+  if (!authStore.isLoggedIn && route.path.startsWith('/profile') && route.path !== '/profile/favorites') {
     navigateTo(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`);
   }
 });

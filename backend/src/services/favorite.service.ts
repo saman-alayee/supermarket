@@ -18,12 +18,29 @@ export class FavoriteService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return favorites.map((f) => ({
-      id: f.id,
-      productId: f.productId,
-      createdAt: f.createdAt,
-      product: productService.formatProductPublic(f.product),
-    }));
+    return favorites.map((f) => productService.formatProductPublic(f.product));
+  }
+
+  async sync(userId: string, productIds: string[]) {
+    const unique = [...new Set(productIds.filter(Boolean))];
+    const products = await prisma.product.findMany({
+      where: { id: { in: unique }, isActive: true },
+      select: { id: true },
+    });
+    const validIds = products.map((p) => p.id);
+    if (!validIds.length) return this.list(userId);
+
+    await prisma.$transaction(
+      validIds.map((productId) =>
+        prisma.favorite.upsert({
+          where: { userId_productId: { userId, productId } },
+          update: {},
+          create: { userId, productId },
+        })
+      )
+    );
+
+    return this.list(userId);
   }
 
   async toggle(userId: string, productId: string) {

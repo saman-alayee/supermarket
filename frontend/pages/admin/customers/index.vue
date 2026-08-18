@@ -17,6 +17,15 @@ const paymentFilter = ref<PaymentMethod | ''>('');
 const selectedCustomer = ref<AdminCustomer | null>(null);
 const detailLoading = ref(false);
 
+const showCreate = ref(false);
+const showBroadcast = ref(false);
+const showGroupForm = ref(false);
+const broadcastMessage = ref('');
+const broadcasting = ref(false);
+
+const newCustomer = reactive({ phone: '', firstName: '', lastName: '', customerGroupId: '' });
+const newGroup = reactive({ name: '', description: '' });
+
 const paymentOptions = [
   { value: '', label: 'همه روش‌ها', icon: 'lucide:credit-card' },
   ...Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({
@@ -37,16 +46,20 @@ const groupOptions = computed(() => [
 
 onMounted(loadData);
 
+function queryParams() {
+  const params = new URLSearchParams();
+  if (search.value.trim()) params.set('search', search.value.trim());
+  if (groupFilter.value) params.set('customerGroupId', groupFilter.value);
+  if (paymentFilter.value) params.set('paymentMethod', paymentFilter.value);
+  params.set('limit', '100');
+  return params;
+}
+
 async function loadData() {
   loading.value = true;
   try {
-    const params = new URLSearchParams();
-    if (search.value.trim()) params.set('search', search.value.trim());
-    if (groupFilter.value) params.set('groupId', groupFilter.value);
-    if (paymentFilter.value) params.set('paymentMethod', paymentFilter.value);
-
     const [customersRes, groupsRes] = await Promise.all([
-      api.get<{ customers: AdminCustomer[] }>(`/admin/customers?${params}`),
+      api.get<{ customers: AdminCustomer[] }>(`/admin/customers?${queryParams()}`),
       api.get<CustomerGroup[]>('/admin/customer-groups').catch(() => ({ data: [] as CustomerGroup[] })),
     ]);
     customers.value = customersRes.data.customers;
@@ -71,30 +84,90 @@ async function openCustomer(customer: AdminCustomer) {
   }
 }
 
+async function createCustomer() {
+  try {
+    await api.post('/admin/customers', {
+      ...newCustomer,
+      customerGroupId: newCustomer.customerGroupId || undefined,
+    });
+    toast.success('مشتری اضافه شد');
+    showCreate.value = false;
+    Object.assign(newCustomer, { phone: '', firstName: '', lastName: '', customerGroupId: '' });
+    await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ایجاد مشتری');
+  }
+}
+
+async function createGroup() {
+  try {
+    await api.post('/admin/customer-groups', { ...newGroup });
+    toast.success('گروه ایجاد شد');
+    showGroupForm.value = false;
+    Object.assign(newGroup, { name: '', description: '' });
+    await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ایجاد گروه');
+  }
+}
+
+async function assignGroup(customerId: string, customerGroupId: string) {
+  try {
+    await api.put(`/admin/customers/${customerId}/group`, {
+      customerGroupId: customerGroupId || null,
+    });
+    toast.success('گروه به‌روزرسانی شد');
+    await loadData();
+    if (selectedCustomer.value?.id === customerId) await openCustomer(selectedCustomer.value);
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا');
+  }
+}
+
+async function sendBroadcast() {
+  if (!broadcastMessage.value.trim()) return;
+  broadcasting.value = true;
+  try {
+    const { data } = await api.post<{ queued: number }>('/admin/customers/broadcast-sms', {
+      message: broadcastMessage.value.trim(),
+      customerGroupId: groupFilter.value || undefined,
+      paymentMethod: paymentFilter.value || undefined,
+    });
+    toast.success(`پیامک برای ${data.queued} مشتری در صف قرار گرفت`);
+    showBroadcast.value = false;
+    broadcastMessage.value = '';
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ارسال پیامک');
+  } finally {
+    broadcasting.value = false;
+  }
+}
+
 function exportCsv() {
-  const header = ['نام', 'موبایل', 'تعداد سفارش', 'تاریخ عضویت'];
-  const rows = customers.value.map((customer) => [
-    `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.phone,
-    customer.phone,
-    String(customer._count.orders),
-    new Date(customer.createdAt).toLocaleDateString('fa-IR'),
-  ]);
-
-  const csv = [header, ...rows]
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `customers-${Date.now()}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  const url = `/admin/customers/export-phones?${queryParams()}`;
+  const config = useRuntimeConfig();
+  const authStore = useAuthStore();
+  fetch(`${config.public.apiBase}${url}`, {
+    headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {},
+  })
+    .then((res) => res.blob())
+    .then((blob) => {
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = `customer-phones-${Date.now()}.csv`;
+      link.click();
+      URL.revokeObjectURL(href);
+    })
+    .catch(() => toast.error('خروجی اکسل ناموفق بود'));
 }
 
 function closeDetail() {
   selectedCustomer.value = null;
+}
+
+function customerName(customer: AdminCustomer) {
+  return `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || '—';
 }
 
 useHead({ title: 'مشتریان - پنل مدیریت' });
@@ -105,9 +178,14 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
       <div>
         <h1 class="text-xl font-bold text-gray-800">مدیریت مشتریان</h1>
-        <p class="text-sm text-gray-500 mt-1">جستجو، گروه‌بندی و تاریخچه سفارش</p>
+        <p class="text-sm text-gray-500 mt-1">لیست خریداران، گروه، پیامک و خروجی شماره</p>
       </div>
-      <button class="btn-secondary text-sm" @click="exportCsv">خروجی CSV</button>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-secondary text-sm" @click="showGroupForm = true">گروه جدید</button>
+        <button class="btn-secondary text-sm" @click="showCreate = true">+ مشتری</button>
+        <button class="btn-secondary text-sm" @click="showBroadcast = true">پیامک گروهی</button>
+        <button class="btn-secondary text-sm" @click="exportCsv">خروجی اکسل</button>
+      </div>
     </div>
 
     <div class="grid md:grid-cols-3 gap-3 mb-4">
@@ -126,25 +204,27 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading" class="card overflow-hidden">
-      <table class="w-full text-sm">
+    <div v-if="!loading" class="card overflow-x-auto">
+      <table class="w-full text-sm min-w-[720px]">
         <thead class="bg-gray-50 text-gray-600">
           <tr>
             <th class="text-start p-3">مشتری</th>
-            <th class="text-start p-3 hidden md:table-cell">موبایل</th>
-            <th class="text-start p-3">سفارش‌ها</th>
-            <th class="text-start p-3 hidden lg:table-cell">گروه</th>
+            <th class="text-start p-3">موبایل</th>
+            <th class="text-start p-3">آدرس</th>
+            <th class="text-start p-3">سفارش</th>
+            <th class="text-start p-3">جمع خرید</th>
+            <th class="text-start p-3">گروه</th>
             <th class="p-3">عملیات</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="customer in customers" :key="customer.id" class="border-t border-gray-100">
-            <td class="p-3 font-medium">
-              {{ customer.firstName || customer.lastName ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : '—' }}
-            </td>
-            <td class="p-3 hidden md:table-cell" dir="ltr">{{ customer.phone }}</td>
+            <td class="p-3 font-medium">{{ customerName(customer) }}</td>
+            <td class="p-3" dir="ltr">{{ customer.phone }}</td>
+            <td class="p-3 text-gray-500 max-w-[180px] truncate">{{ customer.address || '—' }}</td>
             <td class="p-3">{{ formatNumber(customer._count.orders) }}</td>
-            <td class="p-3 hidden lg:table-cell text-gray-500">{{ customer.customerGroup?.name || '—' }}</td>
+            <td class="p-3">{{ formatPrice(customer.totalSpend || 0) }}</td>
+            <td class="p-3 text-gray-500">{{ customer.customerGroup?.name || '—' }}</td>
             <td class="p-3">
               <button class="text-primary-600" @click="openCustomer(customer)">جزئیات</button>
             </td>
@@ -176,9 +256,28 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
               <p class="text-xl font-bold">{{ formatNumber(selectedCustomer._count.orders) }}</p>
             </div>
             <div class="card p-3">
-              <p class="text-xs text-gray-500">گروه</p>
-              <p class="text-sm font-medium">{{ selectedCustomer.customerGroup?.name || 'بدون گروه' }}</p>
+              <p class="text-xs text-gray-500">جمع خرید</p>
+              <p class="text-sm font-bold">{{ formatPrice(selectedCustomer.totalSpend || 0) }}</p>
             </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">گروه مشتری</label>
+            <select
+              class="input-field"
+              :value="selectedCustomer.customerGroupId || ''"
+              @change="assignGroup(selectedCustomer.id, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">بدون گروه</option>
+              <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+            </select>
+          </div>
+
+          <div v-if="selectedCustomer.addresses?.length">
+            <h3 class="text-sm font-bold text-gray-700 mb-2">آدرس‌ها</h3>
+            <p v-for="addr in selectedCustomer.addresses" :key="addr.id" class="text-sm text-gray-600 mb-1">
+              {{ addr.address }}
+            </p>
           </div>
 
           <div>
@@ -200,12 +299,54 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
                 <p v-if="order.paymentMethod" class="text-xs text-gray-400 mt-1">
                   {{ PAYMENT_METHOD_LABELS[order.paymentMethod] }}
                 </p>
+                <p v-if="order.deliveryAddress" class="text-xs text-gray-400 mt-1">{{ order.deliveryAddress }}</p>
               </div>
             </div>
             <EmptyState v-else message="سفارشی ثبت نشده" />
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-if="showCreate" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" @click.self="showCreate = false">
+      <form class="bg-white rounded-2xl w-full max-w-md p-6 space-y-3" @submit.prevent="createCustomer">
+        <h2 class="font-bold text-lg">مشتری جدید</h2>
+        <input v-model="newCustomer.phone" required class="input-field" placeholder="موبایل" dir="ltr" />
+        <input v-model="newCustomer.firstName" class="input-field" placeholder="نام" />
+        <input v-model="newCustomer.lastName" class="input-field" placeholder="نام خانوادگی" />
+        <select v-model="newCustomer.customerGroupId" class="input-field">
+          <option value="">بدون گروه</option>
+          <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+        </select>
+        <div class="flex gap-2">
+          <button class="btn-primary flex-1" type="submit">ذخیره</button>
+          <button class="btn-secondary flex-1" type="button" @click="showCreate = false">انصراف</button>
+        </div>
+      </form>
+    </div>
+
+    <div v-if="showGroupForm" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" @click.self="showGroupForm = false">
+      <form class="bg-white rounded-2xl w-full max-w-md p-6 space-y-3" @submit.prevent="createGroup">
+        <h2 class="font-bold text-lg">گروه مشتری (مثلاً بازنشستگان)</h2>
+        <input v-model="newGroup.name" required class="input-field" placeholder="نام گروه" />
+        <input v-model="newGroup.description" class="input-field" placeholder="توضیح (اختیاری)" />
+        <div class="flex gap-2">
+          <button class="btn-primary flex-1" type="submit">ذخیره</button>
+          <button class="btn-secondary flex-1" type="button" @click="showGroupForm = false">انصراف</button>
+        </div>
+      </form>
+    </div>
+
+    <div v-if="showBroadcast" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" @click.self="showBroadcast = false">
+      <form class="bg-white rounded-2xl w-full max-w-md p-6 space-y-3" @submit.prevent="sendBroadcast">
+        <h2 class="font-bold text-lg">پیامک پروموشن</h2>
+        <p class="text-xs text-gray-500">اگر فیلتر گروه یا روش پرداخت فعال باشد، فقط همان مشتریان پیامک می‌گیرند.</p>
+        <textarea v-model="broadcastMessage" required rows="4" class="input-field resize-none" placeholder="متن پیام" />
+        <div class="flex gap-2">
+          <button class="btn-primary flex-1" type="submit" :disabled="broadcasting">ارسال</button>
+          <button class="btn-secondary flex-1" type="button" @click="showBroadcast = false">انصراف</button>
+        </div>
+      </form>
     </div>
   </div>
 </template>

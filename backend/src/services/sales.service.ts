@@ -108,12 +108,13 @@ export class SalesService {
         createdAt: { gte: since },
         status: { notIn: ['CANCELLED'] },
       },
-      select: { createdAt: true, totalPrice: true, paymentMethod: true },
+      select: { createdAt: true, totalPrice: true, paymentMethod: true, userId: true, customerPhone: true },
       orderBy: { createdAt: 'asc' },
     });
 
     const dailyMap = new Map<string, { date: string; revenue: number; orders: number }>();
     const paymentMap = new Map<string, number>();
+    const customerKeys = new Set<string>();
 
     for (const order of orders) {
       const dateKey = order.createdAt.toISOString().slice(0, 10);
@@ -126,10 +127,16 @@ export class SalesService {
         order.paymentMethod,
         (paymentMap.get(order.paymentMethod) ?? 0) + Number(order.totalPrice)
       );
+      customerKeys.add(order.userId || order.customerPhone);
     }
 
+    const daily = [...dailyMap.values()];
+    const workingDays = daily.filter((day) => new Date(`${day.date}T12:00:00`).getDay() !== 5);
+
     return {
-      daily: [...dailyMap.values()],
+      daily,
+      workingDays,
+      uniqueCustomers: customerKeys.size,
       paymentBreakdown: [...paymentMap.entries()].map(([paymentMethod, revenue]) => ({
         paymentMethod,
         revenue,
@@ -138,26 +145,63 @@ export class SalesService {
   }
 
   async getOverview(days = 30) {
-    const [daily, topProducts, byPayment, chart] = await Promise.all([
+    const [daily, topProducts, byPayment, chart, monthly] = await Promise.all([
       this.getDailySales(),
       this.getTopProducts(10, days),
       this.getByPaymentMethod(days),
       this.getChartData(days),
+      this.getMonthlyComparison(6),
     ]);
 
     const totalRevenue = chart.daily.reduce((sum, d) => sum + d.revenue, 0);
     const orderCount = chart.daily.reduce((sum, d) => sum + d.orders, 0);
+    const uniqueCustomers = chart.uniqueCustomers || 0;
 
     return {
       totalRevenue,
       orderCount,
       avgOrder: orderCount ? Math.round(totalRevenue / orderCount) : 0,
+      avgPerCustomer: uniqueCustomers ? Math.round(totalRevenue / uniqueCustomers) : 0,
+      uniqueCustomers,
       daily: chart.daily,
+      workingDays: chart.workingDays,
       byPayment,
       topProducts,
+      monthly,
       chart,
       today: daily,
     };
+  }
+
+  async getMonthlyComparison(months = 6) {
+    const since = new Date();
+    since.setMonth(since.getMonth() - months);
+    since.setDate(1);
+    since.setHours(0, 0, 0, 0);
+
+    const orders = await prisma.order.findMany({
+      where: { createdAt: { gte: since }, status: { notIn: ['CANCELLED'] } },
+      select: { createdAt: true, totalPrice: true },
+    });
+
+    const monthMap = new Map<string, { month: string; revenue: number; orders: number }>();
+    for (const order of orders) {
+      const key = `${order.createdAt.getFullYear()}-${String(order.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      const entry = monthMap.get(key) ?? { month: key, revenue: 0, orders: 0 };
+      entry.revenue += Number(order.totalPrice);
+      entry.orders += 1;
+      monthMap.set(key, entry);
+    }
+
+    const monthly = [...monthMap.values()].sort((a, b) => a.month.localeCompare(b.month));
+    const current = monthly[monthly.length - 1];
+    const previous = monthly[monthly.length - 2];
+    const changePercent =
+      previous && previous.revenue
+        ? Math.round(((current.revenue - previous.revenue) / previous.revenue) * 100)
+        : null;
+
+    return { monthly, changePercent, current, previous };
   }
 }
 
