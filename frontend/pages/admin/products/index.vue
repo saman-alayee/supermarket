@@ -127,22 +127,22 @@ useHead({ title: 'محصولات - پنل مدیریت' });
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading" class="card overflow-hidden">
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-600">
+    <div v-if="!loading" class="card overflow-x-auto">
+      <table class="data-table">
+        <thead>
           <tr>
-            <th class="text-start p-3 w-14">تصویر</th>
-            <th class="text-start p-3">نام</th>
-            <th class="text-start p-3 hidden md:table-cell">دسته</th>
-            <th class="text-start p-3">قیمت</th>
-            <th class="text-start p-3 hidden md:table-cell">موجودی</th>
-            <th class="text-start p-3">وضعیت</th>
-            <th class="p-3">عملیات</th>
+            <th class="w-14">تصویر</th>
+            <th>نام</th>
+            <th class="hidden md:table-cell">دسته</th>
+            <th>قیمت</th>
+            <th class="hidden md:table-cell">موجودی</th>
+            <th>وضعیت</th>
+            <th>عملیات</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="product in products" :key="product.id" class="border-t border-gray-100">
-            <td class="p-3">
+          <tr v-for="product in products" :key="product.id">
+            <td>
               <div class="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
                 <img
                   v-if="product.image"
@@ -153,17 +153,17 @@ useHead({ title: 'محصولات - پنل مدیریت' });
                 <AppIcon v-else name="lucide:image-off" size="sm" class="text-gray-300" />
               </div>
             </td>
-            <td class="p-3 font-medium">{{ product.name }}</td>
-            <td class="p-3 hidden md:table-cell text-gray-500">{{ product.category?.name }}</td>
-            <td class="p-3">{{ formatPrice(product.effectivePrice) }}</td>
-            <td class="p-3 hidden md:table-cell">{{ product.stock }}</td>
-            <td class="p-3">
+            <td class="font-medium">{{ product.name }}</td>
+            <td class="hidden md:table-cell text-gray-500">{{ product.category?.name }}</td>
+            <td>{{ formatPrice(product.effectivePrice) }}</td>
+            <td class="hidden md:table-cell">{{ product.stock }}</td>
+            <td>
               <span :class="product.isActive ? 'text-green-600' : 'text-red-500'">
                 {{ product.isActive ? 'فعال' : 'غیرفعال' }}
               </span>
             </td>
-            <td class="p-3">
-              <button class="text-primary-600 ml-2" @click="openForm(product)">ویرایش</button>
+            <td>
+              <button class="text-primary-600 ms-2" @click="openForm(product)">ویرایش</button>
               <button class="text-red-500" @click="remove(product.id)">حذف</button>
             </td>
           </tr>

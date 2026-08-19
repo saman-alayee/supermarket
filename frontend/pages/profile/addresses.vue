@@ -29,7 +29,10 @@ onMounted(loadAddresses);
 
 watch(showForm, (open) => {
   if (open) {
-    nextTick(() => mapRef.value?.invalidateSize());
+    nextTick(() => {
+      setTimeout(() => mapRef.value?.invalidateSize(), 250);
+      setTimeout(() => mapRef.value?.invalidateSize(), 800);
+    });
   }
 });
 

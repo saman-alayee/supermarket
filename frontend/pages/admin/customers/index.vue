@@ -18,10 +18,7 @@ const selectedCustomer = ref<AdminCustomer | null>(null);
 const detailLoading = ref(false);
 
 const showCreate = ref(false);
-const showBroadcast = ref(false);
 const showGroupForm = ref(false);
-const broadcastMessage = ref('');
-const broadcasting = ref(false);
 
 const newCustomer = reactive({ phone: '', firstName: '', lastName: '', customerGroupId: '' });
 const newGroup = reactive({ name: '', description: '' });
@@ -124,25 +121,6 @@ async function assignGroup(customerId: string, customerGroupId: string) {
   }
 }
 
-async function sendBroadcast() {
-  if (!broadcastMessage.value.trim()) return;
-  broadcasting.value = true;
-  try {
-    const { data } = await api.post<{ queued: number }>('/admin/customers/broadcast-sms', {
-      message: broadcastMessage.value.trim(),
-      customerGroupId: groupFilter.value || undefined,
-      paymentMethod: paymentFilter.value || undefined,
-    });
-    toast.success(`پیامک برای ${data.queued} مشتری در صف قرار گرفت`);
-    showBroadcast.value = false;
-    broadcastMessage.value = '';
-  } catch (e: unknown) {
-    toast.error(e instanceof Error ? e.message : 'خطا در ارسال پیامک');
-  } finally {
-    broadcasting.value = false;
-  }
-}
-
 function exportCsv() {
   const url = `/admin/customers/export-phones?${queryParams()}`;
   const config = useRuntimeConfig();
@@ -178,12 +156,11 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-6">
       <div>
         <h1 class="text-xl font-bold text-gray-800">مدیریت مشتریان</h1>
-        <p class="text-sm text-gray-500 mt-1">لیست خریداران، گروه، پیامک و خروجی شماره</p>
+        <p class="text-sm text-gray-500 mt-1">لیست خریداران، گروه و خروجی شماره</p>
       </div>
       <div class="flex flex-wrap gap-2">
         <button class="btn-secondary text-sm" @click="showGroupForm = true">گروه جدید</button>
         <button class="btn-secondary text-sm" @click="showCreate = true">+ مشتری</button>
-        <button class="btn-secondary text-sm" @click="showBroadcast = true">پیامک گروهی</button>
         <button class="btn-secondary text-sm" @click="exportCsv">خروجی اکسل</button>
       </div>
     </div>
@@ -205,27 +182,27 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
     <LoadingSpinner :show="loading" />
 
     <div v-if="!loading" class="card overflow-x-auto">
-      <table class="w-full text-sm min-w-[720px]">
-        <thead class="bg-gray-50 text-gray-600">
+      <table class="data-table min-w-[720px]">
+        <thead>
           <tr>
-            <th class="text-start p-3">مشتری</th>
-            <th class="text-start p-3">موبایل</th>
-            <th class="text-start p-3">آدرس</th>
-            <th class="text-start p-3">سفارش</th>
-            <th class="text-start p-3">جمع خرید</th>
-            <th class="text-start p-3">گروه</th>
-            <th class="p-3">عملیات</th>
+            <th>مشتری</th>
+            <th>موبایل</th>
+            <th>آدرس</th>
+            <th>سفارش</th>
+            <th>جمع خرید</th>
+            <th>گروه</th>
+            <th>عملیات</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="customer in customers" :key="customer.id" class="border-t border-gray-100">
-            <td class="p-3 font-medium">{{ customerName(customer) }}</td>
-            <td class="p-3" dir="ltr">{{ customer.phone }}</td>
-            <td class="p-3 text-gray-500 max-w-[180px] truncate">{{ customer.address || '—' }}</td>
-            <td class="p-3">{{ formatNumber(customer._count.orders) }}</td>
-            <td class="p-3">{{ formatPrice(customer.totalSpend || 0) }}</td>
-            <td class="p-3 text-gray-500">{{ customer.customerGroup?.name || '—' }}</td>
-            <td class="p-3">
+          <tr v-for="customer in customers" :key="customer.id">
+            <td class="font-medium">{{ customerName(customer) }}</td>
+            <td dir="ltr">{{ customer.phone }}</td>
+            <td class="text-gray-500 max-w-[180px] truncate">{{ customer.address || '—' }}</td>
+            <td>{{ formatNumber(customer._count.orders) }}</td>
+            <td>{{ formatPrice(customer.totalSpend || 0) }}</td>
+            <td class="text-gray-500">{{ customer.customerGroup?.name || '—' }}</td>
+            <td>
               <button class="text-primary-600" @click="openCustomer(customer)">جزئیات</button>
             </td>
           </tr>
@@ -333,18 +310,6 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
         <div class="flex gap-2">
           <button class="btn-primary flex-1" type="submit">ذخیره</button>
           <button class="btn-secondary flex-1" type="button" @click="showGroupForm = false">انصراف</button>
-        </div>
-      </form>
-    </div>
-
-    <div v-if="showBroadcast" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" @click.self="showBroadcast = false">
-      <form class="bg-white rounded-2xl w-full max-w-md p-6 space-y-3" @submit.prevent="sendBroadcast">
-        <h2 class="font-bold text-lg">پیامک پروموشن</h2>
-        <p class="text-xs text-gray-500">اگر فیلتر گروه یا روش پرداخت فعال باشد، فقط همان مشتریان پیامک می‌گیرند.</p>
-        <textarea v-model="broadcastMessage" required rows="4" class="input-field resize-none" placeholder="متن پیام" />
-        <div class="flex gap-2">
-          <button class="btn-primary flex-1" type="submit" :disabled="broadcasting">ارسال</button>
-          <button class="btn-secondary flex-1" type="button" @click="showBroadcast = false">انصراف</button>
         </div>
       </form>
     </div>

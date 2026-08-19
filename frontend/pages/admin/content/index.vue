@@ -28,8 +28,29 @@ const saving = ref(false);
 const editing = ref<ContentPage | null>(null);
 const form = reactive({ title: '', body: '', isPublished: true });
 const formError = ref('');
+const savedSnapshot = ref('');
 
-onMounted(loadPages);
+const isDirty = computed(
+  () =>
+    !!editing.value &&
+    JSON.stringify({ title: form.title, body: form.body, isPublished: form.isPublished }) !== savedSnapshot.value,
+);
+
+onMounted(() => {
+  loadPages();
+  window.addEventListener('keydown', onHotkey);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onHotkey);
+});
+
+function onHotkey(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (isDirty.value && !saving.value) savePage();
+  }
+}
 
 async function loadPages() {
   loading.value = true;
@@ -60,11 +81,23 @@ async function ensureTermsPage() {
   toast.success('صفحه قوانین ایجاد شد');
 }
 
+function rememberSaved() {
+  savedSnapshot.value = JSON.stringify({
+    title: form.title,
+    body: form.body,
+    isPublished: form.isPublished,
+  });
+}
+
 function selectPage(page: ContentPage) {
+  if (editing.value && page.slug !== editing.value.slug && isDirty.value) {
+    if (!confirm('تغییرات ذخیره‌نشده از بین می‌رود. ادامه می‌دهید؟')) return;
+  }
   editing.value = page;
   form.title = page.title;
   form.body = page.body;
   form.isPublished = page.isPublished;
+  rememberSaved();
 }
 
 async function savePage() {
@@ -77,8 +110,12 @@ async function savePage() {
       body: form.body,
       isPublished: form.isPublished,
     });
-    toast.success('تغییرات ذخیره شد');
+    toast.success('تغییرات ذخیره شد و در سایت اعمال شد');
     editing.value = data;
+    form.title = data.title;
+    form.body = data.body;
+    form.isPublished = data.isPublished;
+    rememberSaved();
     const idx = pages.value.findIndex((p) => p.slug === data.slug);
     if (idx >= 0) pages.value[idx] = data;
     else pages.value.unshift(data);
@@ -152,14 +189,26 @@ useHead({ title: 'قوانین و محتوا - پنل مدیریت' });
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">متن قوانین / محتوا</label>
           <p class="text-xs text-gray-400 mb-2">
-            می‌توانید از Markdown ساده استفاده کنید: <code># عنوان</code> ، <code>## زیرعنوان</code> ، <code>- مورد</code>
+            می‌توانید از Markdown ساده استفاده کنید:
+            <code># عنوان</code> ،
+            <code>## زیرعنوان</code> ،
+            <code>- مورد</code> ،
+            و جدول با <code>| ستون | ستون |</code>
           </p>
           <textarea
             v-model="form.body"
-            rows="18"
-            class="input-field font-mono text-sm resize-y min-h-[320px]"
+            rows="16"
+            class="input-field font-mono text-sm resize-y min-h-[280px]"
             placeholder="متن قوانین و مقررات را اینجا بنویسید..."
           />
+        </div>
+
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-2">پیش‌نمایش در سایت</p>
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 text-gray-700 leading-7 text-sm">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">{{ form.title || 'بدون عنوان' }}</h3>
+            <div v-html="renderContentHtml(form.body || '')" />
+          </div>
         </div>
 
         <AppSwitch
@@ -168,9 +217,13 @@ useHead({ title: 'قوانین و محتوا - پنل مدیریت' });
           description="اگر خاموش باشد، صفحه برای کاربران نمایش داده نمی‌شود"
         />
 
-        <button class="btn-primary w-full sm:w-auto" :disabled="saving" @click="savePage">
-          {{ saving ? 'در حال ذخیره...' : 'ذخیره تغییرات' }}
-        </button>
+        <div class="flex flex-wrap items-center gap-3">
+          <button class="btn-primary w-full sm:w-auto" :disabled="saving || !isDirty" @click="savePage">
+            {{ saving ? 'در حال ذخیره...' : 'ذخیره و نمایش در سایت' }}
+          </button>
+          <span v-if="isDirty" class="text-xs text-amber-600">تغییرات ذخیره‌نشده — Ctrl+S</span>
+          <span v-else class="text-xs text-gray-400">آخرین نسخه ذخیره شده است</span>
+        </div>
       </div>
     </div>
 

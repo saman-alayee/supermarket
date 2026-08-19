@@ -24,6 +24,7 @@ export function useApi() {
     }
 
     const response = await fetch(`${apiBase}${endpoint}`, {
+      cache: 'no-store',
       ...options,
       headers,
     });

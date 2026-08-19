@@ -145,17 +145,17 @@ useHead({ title: 'گزارش فروش - پنل مدیریت' });
       <div class="card p-4">
         <h2 class="font-semibold mb-4">پرفروش‌ترین محصولات</h2>
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="data-table">
             <thead>
-              <tr class="text-gray-500 border-b">
-                <th class="text-start p-2">محصول</th>
-                <th class="text-start p-2">تعداد فروش</th>
+              <tr>
+                <th>محصول</th>
+                <th>تعداد فروش</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in overview.topProducts" :key="item.name" class="border-b border-gray-50">
-                <td class="p-2">{{ item.name }}</td>
-                <td class="p-2">{{ formatNumber(item.totalQuantity) }}</td>
+              <tr v-for="item in overview.topProducts" :key="item.name">
+                <td>{{ item.name }}</td>
+                <td>{{ formatNumber(item.totalQuantity) }}</td>
               </tr>
             </tbody>
           </table>

@@ -437,10 +437,9 @@ router.delete(
 );
 
 // Content pages
-const contentSchema = z.object({
-  slug: z.string().min(2),
-  title: z.string().min(2),
-  body: z.string().min(2),
+const contentUpdateSchema = z.object({
+  title: z.string().min(2).optional(),
+  body: z.string().min(1).optional(),
   isPublished: z.boolean().optional(),
 });
 
@@ -454,6 +453,7 @@ router.get(
 
 router.put(
   '/content/:slug',
+  validate(contentUpdateSchema),
   asyncHandler(async (req, res) => {
     const slug = paramId(req.params.slug);
     const existing = await contentService.getBySlug(slug).catch(() => null);

@@ -120,33 +120,33 @@ useHead({ title: 'کاربران - پنل مدیریت' });
     <LoadingSpinner :show="loading" />
 
     <div v-if="!loading" class="card overflow-x-auto">
-      <table class="w-full text-sm min-w-[640px]">
-        <thead class="bg-gray-50 text-gray-600">
+      <table class="data-table min-w-[640px]">
+        <thead>
           <tr>
-            <th class="text-start p-3">نام</th>
-            <th class="text-start p-3">موبایل</th>
-            <th class="text-start p-3">نقش</th>
-            <th class="text-start p-3">سفارش</th>
-            <th class="text-start p-3">وضعیت</th>
-            <th class="text-start p-3">عملیات</th>
+            <th>نام</th>
+            <th>موبایل</th>
+            <th>نقش</th>
+            <th>سفارش</th>
+            <th>وضعیت</th>
+            <th>عملیات</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in users" :key="user.id" class="border-t border-gray-100">
-            <td class="p-3">{{ user.firstName }} {{ user.lastName }}</td>
-            <td class="p-3" dir="ltr">{{ user.phone }}</td>
-            <td class="p-3">
+          <tr v-for="user in users" :key="user.id">
+            <td>{{ user.firstName }} {{ user.lastName }}</td>
+            <td dir="ltr">{{ user.phone }}</td>
+            <td>
               <span :class="user.role === 'ADMIN' ? 'text-purple-700 bg-purple-50' : 'text-gray-600 bg-gray-100'" class="px-2 py-1 rounded-full text-xs">
                 {{ user.role === 'ADMIN' ? 'ادمین' : 'مشتری' }}
               </span>
             </td>
-            <td class="p-3">{{ user._count.orders }}</td>
-            <td class="p-3">
+            <td>{{ user._count.orders }}</td>
+            <td>
               <span :class="user.isActive !== false ? 'text-green-600' : 'text-red-500'">
                 {{ user.isActive !== false ? 'فعال' : 'غیرفعال' }}
               </span>
             </td>
-            <td class="p-3">
+            <td>
               <div class="flex flex-wrap gap-1">
                 <button
                   v-if="user.role === 'CUSTOMER'"

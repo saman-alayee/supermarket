@@ -15,9 +15,9 @@ defineProps<{
     >
       <AppIcon name="lucide:arrow-right" size="md" />
     </NuxtLink>
-    <div class="min-w-0">
-      <h1 class="text-lg font-bold text-gray-800 truncate">{{ title }}</h1>
-      <p v-if="subtitle" class="text-sm text-gray-500 truncate">{{ subtitle }}</p>
+    <div class="min-w-0 flex-1">
+      <h1 class="text-lg font-bold text-gray-800">{{ title }}</h1>
+      <p v-if="subtitle" class="text-sm text-gray-500 mt-0.5">{{ subtitle }}</p>
     </div>
     <div class="ms-auto shrink-0">
       <slot name="action" />

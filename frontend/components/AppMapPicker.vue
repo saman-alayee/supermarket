@@ -1,6 +1,20 @@
 <script setup lang="ts">
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
+
+const DefaultIcon = L.icon({
+  iconUrl,
+  iconRetinaUrl,
+  shadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 const props = withDefaults(
   defineProps<{
@@ -15,7 +29,7 @@ const props = withDefaults(
     readonly: false,
     geocode: false,
     height: '320px',
-    zoom: 18,
+    zoom: 16,
   }
 );
 
@@ -32,23 +46,77 @@ const locating = ref(false);
 const resolving = ref(false);
 const mapError = ref('');
 
-const KIASAR_CENTER: L.LatLngExpression = [36.68, 50.45];
-const KIASAR_BOUNDS = L.latLngBounds([36.65, 50.4], [36.71, 50.5]);
-const DEFAULT_CENTER = KIASAR_CENTER;
+/** کیاشهر، گیلان */
+const KIASHAHR_CENTER = L.latLng(37.4255, 49.953);
+const KIASHAHR_BOUNDS = L.latLngBounds([37.32, 49.82], [37.53, 50.1]);
 
 let map: L.Map | null = null;
 let marker: L.Marker | null = null;
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
+let resizeObserver: ResizeObserver | null = null;
 let syncingFromProps = false;
 let lastGeocodeKey = '';
 let geocodeRequestId = 0;
 
 function hasCoords(): boolean {
-  return props.latitude != null && props.longitude != null;
+  return props.latitude != null && Number.isFinite(props.latitude)
+    && props.longitude != null && Number.isFinite(props.longitude);
 }
 
 function roundCoord(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function addTiles(target: L.Map) {
+  const sources = [
+    {
+      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+      options: {
+        subdomains: 'abcd',
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+      },
+    },
+    {
+      url: 'https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png',
+      options: {
+        maxZoom: 19,
+        maxNativeZoom: 18,
+        attribution: '&copy; OpenStreetMap',
+      },
+    },
+    {
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      options: {
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        attribution: '&copy; OpenStreetMap',
+      },
+    },
+  ];
+
+  let sourceIndex = 0;
+  let layer: L.TileLayer | null = null;
+  let errors = 0;
+
+  const useSource = (index: number) => {
+    const source = sources[index];
+    if (!source) return;
+    if (layer) target.removeLayer(layer);
+    layer = L.tileLayer(source.url, source.options);
+    layer.on('tileerror', () => {
+      errors += 1;
+      if (errors >= 6 && sourceIndex < sources.length - 1) {
+        errors = 0;
+        sourceIndex += 1;
+        useSource(sourceIndex);
+      }
+    });
+    layer.addTo(target);
+  };
+
+  useSource(0);
 }
 
 async function resolveAddress(lat: number, lng: number) {
@@ -94,25 +162,35 @@ function emitCoords(lat: number, lng: number) {
 }
 
 function updateFromCenter() {
-  if (!map || props.readonly) return;
+  if (!map || props.readonly || syncingFromProps) return;
   const center = map.getCenter();
   emitCoords(center.lat, center.lng);
 }
 
+function clampToDeliveryArea(lat: number, lng: number): L.LatLng {
+  const point = L.latLng(lat, lng);
+  if (KIASHAHR_BOUNDS.contains(point)) return point;
+  return KIASHAHR_BOUNDS.pad(-0.15).getCenter();
+}
+
 function setLocation(lat: number, lng: number, moveMap = true) {
   if (!map) return;
+  const target = props.readonly ? L.latLng(lat, lng) : clampToDeliveryArea(lat, lng);
+  if (!props.readonly && !KIASHAHR_BOUNDS.contains(L.latLng(lat, lng))) {
+    mapError.value = 'موقعیت خارج از محدوده کیاشهر است. نقشه روی کیاشهر تنظیم شد.';
+  }
+
   syncingFromProps = true;
   if (moveMap) {
-    map.setView([lat, lng], Math.max(map.getZoom(), props.zoom), { animate: false });
+    map.setView(target, map.getZoom() || props.zoom, { animate: false });
   }
   if (props.readonly) {
-    marker?.setLatLng([lat, lng]);
-    emit('update:latitude', roundCoord(lat));
-    emit('update:longitude', roundCoord(lng));
-  } else {
-    emitCoords(lat, lng);
+    marker?.setLatLng(target);
   }
-  syncingFromProps = false;
+  emitCoords(target.lat, target.lng);
+  nextTick(() => {
+    syncingFromProps = false;
+  });
 }
 
 function useCurrentLocation() {
@@ -140,50 +218,65 @@ function useCurrentLocation() {
 function initMap() {
   if (!mapContainer.value || map) return;
 
+  const start = hasCoords()
+    ? (props.readonly ? L.latLng(props.latitude!, props.longitude!) : clampToDeliveryArea(props.latitude!, props.longitude!))
+    : KIASHAHR_CENTER;
+
   map = L.map(mapContainer.value, {
-    center: hasCoords() ? [props.latitude!, props.longitude!] : DEFAULT_CENTER,
+    center: start,
     zoom: props.zoom,
+    minZoom: 12,
+    maxZoom: 19,
     scrollWheelZoom: !props.readonly,
-    dragging: true,
+    dragging: !props.readonly,
     zoomControl: !props.readonly,
-    maxBounds: KIASAR_BOUNDS,
-    maxBoundsViscosity: 1.0,
-    minZoom: 13,
+    attributionControl: true,
+    maxBounds: props.readonly ? undefined : KIASHAHR_BOUNDS.pad(0.15),
+    maxBoundsViscosity: props.readonly ? 0 : 0.7,
   });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
-    maxZoom: 20,
-  }).addTo(map);
+  addTiles(map);
 
   if (props.readonly && hasCoords()) {
-    marker = L.marker([props.latitude!, props.longitude!]).addTo(map);
-    return;
+    marker = L.marker(start).addTo(map);
   }
 
   if (!props.readonly) {
     map.on('moveend', updateFromCenter);
-    setTimeout(updateFromCenter, 400);
+    map.whenReady(() => {
+      updateFromCenter();
+      invalidateSize();
+    });
+  }
+
+  if (mapContainer.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => invalidateSize());
+    resizeObserver.observe(mapContainer.value);
   }
 }
 
 function refreshFromProps() {
-  if (!map || !hasCoords()) return;
+  if (!map || !hasCoords() || syncingFromProps) return;
+
+  const next = L.latLng(props.latitude!, props.longitude!);
+  const current = map.getCenter();
+  if (map.distance(current, next) < 12) return;
+
   syncingFromProps = true;
-  map.setView([props.latitude!, props.longitude!], Math.max(map.getZoom(), props.zoom), { animate: false });
+  map.panTo(next, { animate: false });
   if (props.readonly) {
-    if (!marker) marker = L.marker([props.latitude!, props.longitude!]).addTo(map);
-    else marker.setLatLng([props.latitude!, props.longitude!]);
+    if (!marker) marker = L.marker(next).addTo(map);
+    else marker.setLatLng(next);
   }
-  syncingFromProps = false;
+  nextTick(() => {
+    syncingFromProps = false;
+  });
 }
 
 function invalidateSize() {
   nextTick(() => {
-    map?.invalidateSize();
-    if (hasCoords()) {
-      map?.setView([props.latitude!, props.longitude!], map?.getZoom() || props.zoom, { animate: false });
-    }
+    if (!map) return;
+    map.invalidateSize({ animate: false });
   });
 }
 
@@ -197,12 +290,15 @@ watch(
 onMounted(() => {
   nextTick(() => {
     initMap();
-    setTimeout(invalidateSize, 250);
+    setTimeout(invalidateSize, 200);
+    setTimeout(invalidateSize, 700);
   });
 });
 
 onUnmounted(() => {
   if (geocodeTimer) clearTimeout(geocodeTimer);
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   map?.remove();
   map = null;
   marker = null;
@@ -211,8 +307,8 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-2">
-    <div class="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-      <div ref="mapContainer" :style="{ height }" class="w-full z-0 touch-pan-y" />
+    <div class="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100" dir="ltr">
+      <div ref="mapContainer" :style="{ height }" class="w-full z-0" />
 
       <div
         v-if="!readonly"
@@ -250,7 +346,7 @@ onUnmounted(() => {
 
     <div v-if="!readonly" class="space-y-1">
       <p class="text-xs text-gray-500 leading-relaxed">
-        {{ geocode ? 'نقشه را جابه‌جا کنید تا پین دقیقاً روی محل تحویل قرار بگیرد.' : 'فقط موقعیت GPS برای پیک مشخص می‌شود؛ آدرس را خودتان در فرم وارد کنید.' }}
+        {{ geocode ? 'نقشه را جابه‌جا کنید تا پین دقیقاً روی محل تحویل قرار بگیرد.' : 'نقشه را روی محل تحویل در کیاشهر بگذارید؛ آدرس را در فرم وارد کنید.' }}
       </p>
       <p v-if="hasCoords()" class="text-[11px] text-gray-400" dir="ltr">
         {{ latitude?.toFixed(6) }}, {{ longitude?.toFixed(6) }}
@@ -264,5 +360,15 @@ onUnmounted(() => {
 <style scoped>
 :deep(.leaflet-container) {
   font-family: inherit;
+  direction: ltr;
+  background: #e8eef3;
+}
+:deep(.leaflet-control-zoom) {
+  border: 0 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+:deep(.leaflet-touch .leaflet-control-zoom) {
+  margin-top: 12px;
+  margin-left: 12px;
 }
 </style>

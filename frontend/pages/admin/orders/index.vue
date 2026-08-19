@@ -28,8 +28,8 @@ const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
 };
 
 const STATUS_HINTS: Partial<Record<OrderStatus, string>> = {
-  REVIEWING: 'سفارش در انتظار تأیید روش پرداخت است',
-  NEW: 'پرداخت تأیید شد — آماده آماده‌سازی',
+  REVIEWING: 'نوع پرداخت انتخاب شده است — در سیستم فروشگاه ثبت کنید',
+  NEW: 'آماده آماده‌سازی',
   SHIPPED: 'پیام «تحویل به پیک» به مشتری ارسال می‌شود',
   PREPARING: 'پیام «بسته‌بندی شد» به مشتری ارسال می‌شود',
   DELIVERED: 'سفارش تکمیل شد',
@@ -38,15 +38,6 @@ const STATUS_HINTS: Partial<Record<OrderStatus, string>> = {
 
 function paymentLabel(method?: Order['paymentMethod']) {
   return method ? PAYMENT_METHOD_LABELS[method] : '—';
-}
-
-function paymentDetailsText(order: Order) {
-  const details = order.paymentDetails;
-  if (!details || typeof details !== 'object') return '';
-  return Object.entries(details)
-    .filter(([, value]) => value)
-    .map(([key, value]) => `${key}: ${value}`)
-    .join(' · ');
 }
 
 onMounted(loadOrders);
@@ -201,11 +192,11 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
           />
           <p v-if="selectedOrder.couponCode"><span class="text-gray-500">کد تخفیف:</span> {{ selectedOrder.couponCode }}</p>
           <p>
-            <span class="text-gray-500">روش پرداخت:</span>
+            <span class="text-gray-500">نوع پرداخت:</span>
             {{ paymentLabel(selectedOrder.paymentMethod) }}
           </p>
-          <p v-if="paymentDetailsText(selectedOrder)" class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2">
-            {{ paymentDetailsText(selectedOrder) }}
+          <p v-if="selectedOrder.paymentMethod && selectedOrder.paymentMethod !== 'CASH_AT_DOOR'" class="text-xs text-amber-800 bg-amber-50 rounded-lg p-2">
+            این گزینه را در سیستم فروشگاه ثبت کنید؛ پرداخت در سایت انجام نشده است.
           </p>
           <p v-if="selectedOrder.discountAmount">
             <span class="text-gray-500">تخفیف:</span> {{ formatPrice(selectedOrder.discountAmount) }}

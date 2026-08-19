@@ -17,6 +17,12 @@ export default defineNuxtConfig({
     },
   },
 
+  nitro: {
+    prerender: {
+      routes: ['/pages/terms', '/pages/about', '/pages/privacy', '/pages/shipping', '/pages/faq'],
+    },
+  },
+
   app: {
     head: {
       htmlAttrs: { lang: 'fa', dir: 'rtl' },

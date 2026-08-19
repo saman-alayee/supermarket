@@ -18,21 +18,12 @@ const form = reactive({
   notes: '',
   couponCode: '',
   paymentMethod: 'CASH_AT_DOOR' as PaymentMethod,
-  nationalId: '',
-  salaryCard: '',
-  taraId: '',
-  walletNote: '',
 });
 
 const mapLat = ref<number | null>(null);
 const mapLng = ref<number | null>(null);
 
 const loading = ref(false);
-const otpSending = ref(false);
-const otpVerified = ref(false);
-const otpDevCode = ref('');
-const retireePhone = ref('');
-const retireeOtp = ref('');
 const error = ref('');
 const couponLoading = ref(false);
 const addressesLoading = ref(false);
@@ -46,11 +37,11 @@ const appliedCoupon = ref<{
 } | null>(null);
 
 const paymentOptions: { value: PaymentMethod; label: string; hint?: string }[] = [
-  { value: 'CASH_AT_DOOR', label: PAYMENT_METHOD_LABELS.CASH_AT_DOOR },
-  { value: 'RETIREMENT_FUND', label: PAYMENT_METHOD_LABELS.RETIREMENT_FUND, hint: 'کد ملی + شماره کارت حقوقی' },
-  { value: 'SOCIAL_SECURITY', label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY, hint: 'ارسال کد به موبایل بازنشسته' },
-  { value: 'TARA', label: PAYMENT_METHOD_LABELS.TARA, hint: 'شناسه خرید تارا' },
-  { value: 'OTHER_WALLET', label: PAYMENT_METHOD_LABELS.OTHER_WALLET, hint: 'نوع کیف پول در توضیحات' },
+  { value: 'CASH_AT_DOOR', label: PAYMENT_METHOD_LABELS.CASH_AT_DOOR, hint: 'مبلغ هنگام تحویل دریافت می‌شود' },
+  { value: 'RETIREMENT_FUND', label: PAYMENT_METHOD_LABELS.RETIREMENT_FUND },
+  { value: 'SOCIAL_SECURITY', label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY },
+  { value: 'TARA', label: PAYMENT_METHOD_LABELS.TARA },
+  { value: 'OTHER_WALLET', label: PAYMENT_METHOD_LABELS.OTHER_WALLET },
 ];
 
 const displayTotal = computed(() => appliedCoupon.value?.totalPrice ?? cartStore.totalPrice);
@@ -115,58 +106,6 @@ async function applyCoupon() {
   }
 }
 
-function buildPaymentDetails(): Record<string, string> | undefined {
-  if (form.paymentMethod === 'CASH_AT_DOOR') return undefined;
-  const details: Record<string, string> = { phone: form.customerPhone.trim() };
-  if (form.paymentMethod === 'RETIREMENT_FUND') {
-    details.nationalId = form.nationalId.trim();
-    details.salaryCard = form.salaryCard.trim();
-  }
-  if (form.paymentMethod === 'SOCIAL_SECURITY') {
-    details.retireePhone = retireePhone.value.trim() || form.customerPhone.trim();
-    if (otpVerified.value) details.otpVerified = 'true';
-    else details.otpCode = retireeOtp.value.trim();
-  }
-  if (form.paymentMethod === 'TARA') {
-    details.taraId = form.taraId.trim();
-  }
-  if (form.paymentMethod === 'OTHER_WALLET' && form.walletNote.trim()) {
-    details.walletNote = form.walletNote.trim();
-  }
-  return details;
-}
-
-async function sendSocialOtp() {
-  const phone = (retireePhone.value.trim() || form.customerPhone.trim());
-  if (!/^09\d{9}$/.test(phone)) {
-    error.value = 'شماره موبایل بازنشسته معتبر نیست';
-    return;
-  }
-  otpSending.value = true;
-  otpVerified.value = false;
-  try {
-    const { data } = await api.post<{ message: string; devCode?: string }>('/auth/send-otp', { phone });
-    otpDevCode.value = data.devCode || '';
-    toast.success('کد تأیید ارسال شد');
-  } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'خطا در ارسال کد';
-  } finally {
-    otpSending.value = false;
-  }
-}
-
-async function confirmSocialOtp() {
-  const phone = retireePhone.value.trim() || form.customerPhone.trim();
-  try {
-    await api.post('/auth/confirm-otp', { phone, code: retireeOtp.value.trim() });
-    otpVerified.value = true;
-    toast.success('کد تأیید شد');
-  } catch (e: unknown) {
-    otpVerified.value = false;
-    error.value = e instanceof Error ? e.message : 'کد تأیید نامعتبر است';
-  }
-}
-
 async function submitOrder() {
   error.value = '';
 
@@ -203,31 +142,14 @@ async function submitOrder() {
     };
   }
 
-  if (form.paymentMethod === 'RETIREMENT_FUND' && (!form.nationalId.trim() || !form.salaryCard.trim())) {
-    error.value = 'کد ملی و شماره کارت حقوقی الزامی است';
-    toast.error(error.value);
-    return;
-  }
-  if (form.paymentMethod === 'TARA' && !form.taraId.trim()) {
-    error.value = 'شناسه خرید تارا را وارد کنید';
-    toast.error(error.value);
-    return;
-  }
-  if (form.paymentMethod === 'SOCIAL_SECURITY' && !otpVerified.value) {
-    error.value = 'ابتدا کد تأیید تامین اجتماعی را وارد کنید';
-    toast.error(error.value);
-    return;
-  }
-
   loading.value = true;
   try {
     const payload = {
       customerName: form.customerName.trim(),
       customerPhone: form.customerPhone.trim(),
-      notes: [form.notes, form.walletNote].filter(Boolean).join(' | ') || undefined,
+      notes: form.notes.trim() || undefined,
       couponCode: appliedCoupon.value?.code || undefined,
       paymentMethod: form.paymentMethod,
-      paymentDetails: buildPaymentDetails(),
       ...deliveryPayload,
     };
 
@@ -325,7 +247,10 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
       </div>
 
       <div class="card p-4 space-y-3">
-        <h2 class="text-sm font-bold text-gray-800">روش پرداخت</h2>
+        <h2 class="text-sm font-bold text-gray-800">نوع پرداخت</h2>
+        <p class="text-xs text-gray-500 leading-relaxed">
+          پرداخت در سایت انجام نمی‌شود. فقط گزینه را انتخاب کنید؛ فروشگاه بعد از ثبت سفارش، همین روش را در سیستم فروشگاه ثبت می‌کند.
+        </p>
         <label v-for="opt in paymentOptions" :key="opt.value" class="flex items-start gap-3 cursor-pointer">
           <input v-model="form.paymentMethod" type="radio" :value="opt.value" class="mt-1" />
           <span>
@@ -334,44 +259,9 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
           </span>
         </label>
 
-        <div v-if="form.paymentMethod === 'RETIREMENT_FUND'" class="grid grid-cols-2 gap-2 pt-2">
-          <input v-model="form.nationalId" class="input-field" placeholder="کد ملی" dir="ltr" />
-          <input v-model="form.salaryCard" class="input-field" placeholder="شماره کارت حقوقی" dir="ltr" />
-        </div>
-        <div v-if="form.paymentMethod === 'TARA'" class="pt-2">
-          <input v-model="form.taraId" class="input-field" placeholder="شناسه خرید تارا" dir="ltr" />
-        </div>
-        <div v-if="form.paymentMethod === 'SOCIAL_SECURITY'" class="space-y-2 pt-2">
-          <input
-            v-model="retireePhone"
-            class="input-field"
-            placeholder="شماره همراه بازنشسته"
-            dir="ltr"
-          />
-          <div class="flex gap-2">
-            <input v-model="retireeOtp" class="input-field" placeholder="کد تأیید" dir="ltr" maxlength="6" />
-            <button type="button" class="btn-secondary shrink-0" :disabled="otpSending" @click="sendSocialOtp">
-              {{ otpSending ? '...' : 'ارسال کد' }}
-            </button>
-          </div>
-          <button
-            v-if="retireeOtp"
-            type="button"
-            class="btn-primary w-full text-sm"
-            :class="otpVerified ? 'opacity-70' : ''"
-            @click="confirmSocialOtp"
-          >
-            {{ otpVerified ? 'کد تأیید شد' : 'تأیید کد' }}
-          </button>
-          <p v-if="otpDevCode" class="text-xs text-amber-600">کد آزمایشی: {{ otpDevCode }}</p>
-        </div>
-        <div v-if="form.paymentMethod === 'OTHER_WALLET'" class="pt-2">
-          <input v-model="form.walletNote" class="input-field" placeholder="نوع کیف پول" />
-        </div>
-
         <AppAlertBanner
           v-if="isInstallment"
-          message="مشتری گرامی؛ در خریدهای اقساطی سفارش در وضعیت «در حال بررسی» قرار می‌گیرد و حداکثر ۱ تا ۶ ساعت کاری کارشناس با شما تماس می‌گیرد."
+          message="سفارش با این نوع پرداخت در وضعیت «در حال بررسی» ثبت می‌شود تا فروشگاه آن را در سیستم خودش ثبت کند."
           variant="info"
         />
       </div>

@@ -14,6 +14,17 @@
     @apply bg-white text-gray-800 antialiased;
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    text-align: start;
+    vertical-align: middle;
+  }
 }
 
 @layer components {
@@ -59,6 +70,24 @@
   .price-text {
     font-variant-numeric: tabular-nums;
     unicode-bidi: isolate;
+  }
+
+  .data-table {
+    @apply w-full text-sm;
+    border-collapse: collapse;
+  }
+
+  .data-table th,
+  .data-table td {
+    @apply text-start align-middle px-3 py-3;
+  }
+
+  .data-table thead th {
+    @apply bg-gray-50 text-gray-600 font-semibold whitespace-nowrap;
+  }
+
+  .data-table tbody tr {
+    @apply border-t border-gray-100;
   }
 
   .sr-only {
