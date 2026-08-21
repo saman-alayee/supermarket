@@ -107,9 +107,9 @@ function handleSearch() {
           <AppIcon name="lucide:percent" size="sm" />
           تخفیف‌دار
         </NuxtLink>
-        <NuxtLink to="/pages/terms" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
-          <AppIcon name="lucide:file-text" size="sm" />
-          قوانین
+        <NuxtLink to="/contact" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
+          <AppIcon name="lucide:phone" size="sm" />
+          تماس با ما
         </NuxtLink>
       </nav>
     </div>

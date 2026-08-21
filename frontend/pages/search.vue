@@ -7,6 +7,8 @@ const api = useApi();
 const query = ref('');
 const products = ref<Product[]>([]);
 const loading = ref(false);
+const pageTitle = ref('جستجو');
+
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function syncFromRoute() {
@@ -14,15 +16,28 @@ function syncFromRoute() {
 }
 
 async function loadSearch() {
-  const term = query.value.trim();
-  if (!term) {
-    products.value = [];
-    loading.value = false;
-    return;
-  }
-
   loading.value = true;
   try {
+    if (route.query.discounted === '1') {
+      pageTitle.value = 'محصولات تخفیف‌دار';
+      const { data } = await api.get<{ products: Product[] }>('/products?discounted=true&limit=50');
+      products.value = data.products;
+      return;
+    }
+    if (route.query.featured === '1') {
+      pageTitle.value = 'محصولات ویژه';
+      const { data } = await api.get<{ products: Product[] }>('/products?featured=true&limit=50');
+      products.value = data.products;
+      return;
+    }
+
+    pageTitle.value = 'جستجو';
+    const term = query.value.trim();
+    if (!term) {
+      products.value = [];
+      return;
+    }
+
     const { data } = await api.get<{ products: Product[] }>(
       `/products?search=${encodeURIComponent(term)}&limit=50`
     );
@@ -42,7 +57,7 @@ function onQueryInput() {
 }
 
 watch(
-  () => route.query.q,
+  () => [route.query.q, route.query.discounted, route.query.featured],
   () => {
     syncFromRoute();
     loadSearch();
@@ -51,39 +66,35 @@ watch(
 );
 
 useHead(() => ({
-  title: query.value ? `جستجو: ${query.value} - KIAA KALA` : 'جستجو - KIAA KALA',
+  title: `${pageTitle.value} - KIAA KALA`,
 }));
 </script>
 
 <template>
   <div class="px-4 py-4">
-    <form class="mb-5" @submit.prevent="loadSearch">
+    <h1 class="section-title">{{ pageTitle }}</h1>
+
+    <form v-if="!route.query.discounted && !route.query.featured" class="mb-5" @submit.prevent="loadSearch">
       <div class="relative">
         <input
           v-model="query"
           type="search"
-          placeholder="جستجوی محصول..."
-          class="input-field pe-12 bg-gray-50"
+          class="input-field pe-12"
+          placeholder="نام محصول را جستجو کنید..."
           @input="onQueryInput"
         />
-        <button type="submit" class="absolute end-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-600">
+        <button type="submit" class="absolute end-3 top-1/2 -translate-y-1/2 text-gray-400">
           <AppIcon name="lucide:search" size="md" />
         </button>
       </div>
     </form>
 
-    <h1 v-if="query" class="section-title">
-      نتایج جستجو
-      <span class="text-primary-600">«{{ query }}»</span>
-    </h1>
-    <p v-else class="text-sm text-gray-500 mb-4">نام محصول مورد نظر را جستجو کنید.</p>
-
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading && products.length" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+    <div v-if="!loading" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
       <ProductCard v-for="product in products" :key="product.id" :product="product" />
     </div>
 
-    <EmptyState v-if="!loading && query && !products.length" message="محصولی یافت نشد" />
+    <EmptyState v-if="!loading && !products.length" message="محصولی یافت نشد" />
   </div>
 </template>

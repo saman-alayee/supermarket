@@ -12,6 +12,8 @@ const tags = ref<Tag[]>([]);
 const loading = ref(true);
 const showForm = ref(false);
 const editingId = ref<string | null>(null);
+const search = ref('');
+const categoryFilter = ref('');
 
 const form = reactive({
   name: '',
@@ -52,8 +54,12 @@ onMounted(loadData);
 async function loadData() {
   loading.value = true;
   try {
+    const params = new URLSearchParams({ limit: '100' });
+    if (search.value.trim()) params.set('search', search.value.trim());
+    if (categoryFilter.value) params.set('categoryId', categoryFilter.value);
+
     const [prodRes, catRes, tagsRes] = await Promise.all([
-      api.get<{ products: Product[] }>('/admin/products?limit=100'),
+      api.get<{ products: Product[] }>(`/admin/products?${params}`),
       api.get<Category[]>('/admin/categories'),
       api.get<Tag[]>('/admin/tags').catch(() => ({ data: [] as Tag[] })),
     ]);
@@ -120,6 +126,23 @@ useHead({ title: 'محصولات - پنل مدیریت' });
 <template>
   <div>
     <h1 class="text-xl font-bold text-gray-800 mb-6">مدیریت محصولات</h1>
+    <div class="flex flex-col md:flex-row gap-3 mb-4">
+      <input
+        v-model="search"
+        type="search"
+        class="input-field md:max-w-sm"
+        placeholder="جستجو نام محصول..."
+        @keyup.enter="loadData"
+      />
+      <AppSelect
+        v-model="categoryFilter"
+        :options="[{ value: '', label: 'همه دسته‌ها', icon: 'lucide:layers' }, ...categoryOptions]"
+        class="md:max-w-xs"
+        @update:model-value="loadData"
+      />
+      <button class="btn-secondary text-sm" @click="loadData">اعمال فیلتر</button>
+    </div>
+
     <div class="flex justify-between items-center mb-6">
       <p class="text-sm text-gray-500">{{ products.length }} محصول</p>
       <button class="btn-primary text-sm py-2" @click="openForm()">+ افزودن محصول</button>

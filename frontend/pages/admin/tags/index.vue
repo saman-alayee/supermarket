@@ -19,6 +19,18 @@ const form = reactive({
   sortOrder: 0,
 });
 
+const search = ref('');
+const categoryFilter = ref('');
+
+const filteredTags = computed(() =>
+  tags.value.filter((tag) => {
+    if (categoryFilter.value && tag.categoryId !== categoryFilter.value) return false;
+    if (!search.value.trim()) return true;
+    const term = search.value.trim();
+    return tag.name.includes(term) || tag.slug.includes(term);
+  })
+);
+
 onMounted(loadData);
 
 async function loadData() {
@@ -83,10 +95,19 @@ useHead({ title: 'برچسب‌ها - پنل مدیریت' });
       <button class="btn-primary text-sm" @click="openForm()">+ برچسب جدید</button>
     </div>
 
+    <div class="flex flex-col md:flex-row gap-3 mb-4">
+      <input v-model="search" type="search" class="input-field md:max-w-xs" placeholder="جستجو برچسب..." />
+      <AppSelect
+        v-model="categoryFilter"
+        :options="[{ value: '', label: 'همه دسته‌ها', icon: 'lucide:layers' }, ...categories.map((c) => ({ value: c.id, label: c.name, icon: 'lucide:folder' }))]"
+        class="md:max-w-xs"
+      />
+    </div>
+
     <LoadingSpinner :show="loading" />
 
     <div v-if="!loading" class="grid gap-3">
-      <div v-for="tag in tags" :key="tag.id" class="card p-4 flex items-center justify-between gap-3">
+      <div v-for="tag in filteredTags" :key="tag.id" class="card p-4 flex items-center justify-between gap-3">
         <div>
           <p class="font-semibold">{{ tag.icon }} {{ tag.name }}</p>
           <p class="text-xs text-gray-500 mt-1">{{ tag.category?.name }} • {{ tag._count?.products ?? 0 }} محصول</p>

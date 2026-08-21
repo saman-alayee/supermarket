@@ -14,6 +14,8 @@ const orders = ref<Order[]>([]);
 const loading = ref(true);
 const search = ref('');
 const statusFilter = ref((route.query.status as OrderStatus) || '');
+const dateFrom = ref('');
+const dateTo = ref('');
 const selectedOrder = ref<Order | null>(null);
 const statusNote = ref('');
 const statusError = ref('');
@@ -48,6 +50,8 @@ async function loadOrders() {
     const params = new URLSearchParams();
     if (statusFilter.value) params.set('status', statusFilter.value);
     if (search.value) params.set('search', search.value);
+    if (dateFrom.value) params.set('dateFrom', dateFrom.value);
+    if (dateTo.value) params.set('dateTo', dateTo.value);
     const { data } = await api.get<{ orders: Order[]; pagination: Pagination }>(`/admin/orders?${params}`);
     orders.value = data.orders;
   } finally {
@@ -113,6 +117,8 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
         @keyup.enter="loadOrders"
       />
       <button class="btn-secondary text-sm" @click="loadOrders">جستجو</button>
+      <input v-model="dateFrom" type="date" class="input-field md:max-w-[160px]" title="از تاریخ" />
+      <input v-model="dateTo" type="date" class="input-field md:max-w-[160px]" title="تا تاریخ" />
     </div>
 
     <div class="flex gap-2 overflow-x-auto mb-6">

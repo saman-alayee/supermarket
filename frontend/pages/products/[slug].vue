@@ -34,6 +34,12 @@ watch(galleryImages, (images) => {
   }
 });
 
+async function buyNow() {
+  if (!product.value?.inStock) return;
+  await cartStore.addItem(product.value.id);
+  navigateTo('/checkout');
+}
+
 async function loadRelated() {
   if (!product.value) return;
   try {
@@ -147,9 +153,12 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
 
     <div v-if="product.inStock" class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100">
       <div class="max-w-lg mx-auto">
-        <div v-if="quantity === 0">
-          <button class="btn-primary w-full min-h-[52px]" @click="cartStore.addItem(product.id)">
-            افزودن به سبد خرید
+        <div v-if="quantity === 0" class="flex gap-2">
+          <button class="btn-primary flex-1 min-h-[52px]" @click="cartStore.addItem(product.id)">
+            افزودن به سبد
+          </button>
+          <button class="btn-secondary flex-1 min-h-[52px]" @click="buyNow">
+            خرید و پرداخت
           </button>
         </div>
         <div v-else class="flex items-center justify-center gap-4 bg-primary-50 rounded-2xl p-3">
@@ -167,6 +176,17 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
             <AppIcon name="lucide:plus" size="md" />
           </button>
         </div>
+      </div>
+    </div>
+
+    <div
+      v-else
+      class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100"
+    >
+      <div class="max-w-lg mx-auto">
+        <button type="button" class="btn-secondary w-full min-h-[52px] opacity-70 cursor-not-allowed" disabled>
+          اتمام موجودی
+        </button>
       </div>
     </div>
   </div>

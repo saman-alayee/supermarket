@@ -51,11 +51,15 @@ interface CreateOrderInput {
   addressTitle?: string;
   deliveryLatitude?: number;
   deliveryLongitude?: number;
+  deliveryMethod?: 'FREE' | 'JET';
   notes?: string;
   couponCode?: string;
   paymentMethod: PaymentMethod;
   paymentDetails?: Record<string, unknown>;
 }
+
+const FREE_SHIPPING_MIN = 200_000;
+const JET_DELIVERY_FEE = 50_000;
 
 function buildDeliveryAddress(input: CreateOrderInput): string {
   if (input.deliveryAddress?.trim()) {
@@ -109,10 +113,6 @@ export class OrderService {
 
     const resolvedUserId = await ensureCustomerUser(input, userId);
 
-    const paymentDetailsToStore = input.paymentDetails
-      ? Object.fromEntries(Object.entries(input.paymentDetails).filter(([, value]) => value != null && value !== ''))
-      : undefined;
-
     const subtotal = cart.totalPrice;
     let discountAmount = 0;
     let totalPrice = subtotal;
@@ -129,6 +129,26 @@ export class OrderService {
       couponId = validation.couponId;
       couponCode = validation.code;
     }
+
+    const deliveryMethod = input.deliveryMethod ?? 'FREE';
+    let deliveryFee = 0;
+    if (deliveryMethod === 'JET') {
+      deliveryFee = JET_DELIVERY_FEE;
+    } else if (totalPrice < FREE_SHIPPING_MIN) {
+      throw new AppError(400, 'برای ارسال رایگان سفارش باید حداقل ۲۰۰٬۰۰۰ تومان باشد یا گزینه ارسال جت را انتخاب کنید');
+    }
+    totalPrice += deliveryFee;
+
+    const paymentDetailsToStore = {
+      ...(input.paymentDetails ?? {}),
+      deliveryMethod,
+      deliveryFee,
+    };
+    const cleanedPaymentDetails = Object.fromEntries(
+      Object.entries(paymentDetailsToStore).filter(
+        ([, value]) => value != null && (typeof value === 'number' || String(value).trim() !== '')
+      )
+    );
 
     let deliveryAddress = buildDeliveryAddress(input);
     let addressId: string | null = input.addressId ?? null;
@@ -171,8 +191,8 @@ export class OrderService {
           couponId: couponId ?? null,
           status: initialStatus,
           paymentMethod: input.paymentMethod,
-          paymentDetails: paymentDetailsToStore
-            ? (paymentDetailsToStore as Prisma.InputJsonValue)
+          paymentDetails: Object.keys(cleanedPaymentDetails).length
+            ? (cleanedPaymentDetails as Prisma.InputJsonValue)
             : undefined,
           customerName: input.customerName,
           customerPhone: input.customerPhone,
@@ -303,11 +323,19 @@ export class OrderService {
     page?: number;
     limit?: number;
     search?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) {
-    const { status, paymentMethod, page = 1, limit = 20, search } = filters;
+    const { status, paymentMethod, page = 1, limit = 20, search, dateFrom, dateTo } = filters;
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (paymentMethod) where.paymentMethod = paymentMethod;
+    if (dateFrom || dateTo) {
+      where.createdAt = {
+        ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+        ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999Z`) } : {}),
+      };
+    }
     if (search) {
       where.OR = [
         { orderNumber: { contains: search } },

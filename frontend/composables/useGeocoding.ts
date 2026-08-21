@@ -69,6 +69,14 @@ export function mapsLink(latitude: number, longitude: number): string {
   return `https://www.google.com/maps?q=${latitude},${longitude}`;
 }
 
+export function neshanMapsLink(latitude: number, longitude: number): string {
+  return `https://neshan.org/maps/@${latitude},${longitude},16z`;
+}
+
+export function neshanRoutingLink(latitude: number, longitude: number): string {
+  return `https://neshan.org/maps/routing/car/destination/${latitude},${longitude}`;
+}
+
 export function useGeocoding() {
-  return { reverseGeocode, mapsLink };
+  return { reverseGeocode, mapsLink, neshanMapsLink, neshanRoutingLink };
 }

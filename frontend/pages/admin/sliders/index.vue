@@ -22,6 +22,18 @@ const form = reactive({
   isActive: true,
 });
 
+const search = ref('');
+const placementFilter = ref('');
+
+const filteredSliders = computed(() =>
+  sliders.value.filter((slider) => {
+    if (placementFilter.value && slider.placement !== placementFilter.value) return false;
+    if (!search.value.trim()) return true;
+    const term = search.value.trim();
+    return (slider.title || '').includes(term) || (slider.linkUrl || '').includes(term);
+  })
+);
+
 const sizeHint = computed(() =>
   form.placement === 'HOME_TOP'
     ? 'سایز پیشنهادی بنر بالا: ۱۶۰۰ × ۷۰۰ پیکسل (نسبت حدود ۲ به ۱)'
@@ -134,10 +146,23 @@ useHead({ title: 'اسلایدر - پنل مدیریت' });
       </ul>
     </div>
 
+    <div class="flex flex-col md:flex-row gap-3 mb-4">
+      <input v-model="search" type="search" class="input-field md:max-w-xs" placeholder="جستجو عنوان یا لینک..." />
+      <AppSelect
+        v-model="placementFilter"
+        :options="[
+          { value: '', label: 'همه جایگاه‌ها', icon: 'lucide:images' },
+          { value: 'HOME_TOP', label: 'بالای صفحه', icon: 'lucide:panel-top' },
+          { value: 'HOME_MID', label: 'میان دسته‌ها', icon: 'lucide:rows-3' },
+        ]"
+        class="md:max-w-xs"
+      />
+    </div>
+
     <LoadingSpinner :show="loading" />
 
     <div v-if="!loading" class="grid md:grid-cols-2 gap-4">
-      <div v-for="slider in sliders" :key="slider.id" class="card overflow-hidden">
+      <div v-for="slider in filteredSliders" :key="slider.id" class="card overflow-hidden">
         <img
           :src="resolveMediaUrl(slider.image)"
           :alt="slider.title || ''"
@@ -159,7 +184,7 @@ useHead({ title: 'اسلایدر - پنل مدیریت' });
       </div>
     </div>
 
-    <EmptyState v-if="!loading && !sliders.length" message="هنوز اسلایدری ساخته نشده" />
+    <EmptyState v-if="!loading && !filteredSliders.length" message="اسلایدری یافت نشد" />
 
     <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <form class="bg-white rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" @submit.prevent="save">

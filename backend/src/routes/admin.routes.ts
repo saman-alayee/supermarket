@@ -174,6 +174,8 @@ router.get(
     const result = await orderService.getAllOrders({
       status: req.query.status as OrderStatus,
       search: req.query.search as string,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
       page: req.query.page ? parseInt(req.query.page as string) : 1,
       limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
     });

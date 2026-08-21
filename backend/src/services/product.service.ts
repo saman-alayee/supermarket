@@ -94,8 +94,9 @@ export class ProductService {
       prisma.product.count({ where }),
     ]);
 
+    const formatted = products.map((product) => this.formatProduct(product));
     const result = {
-      products: products.map((product) => this.formatProduct(product)),
+      products: this.sortByDiscountPercent(formatted),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
 
@@ -258,7 +259,7 @@ export class ProductService {
             slug: category.slug,
             image: category.image,
           },
-          products: products.map((p) => this.formatProduct(p)),
+          products: this.sortByDiscountPercent(products.map((p) => this.formatProduct(p))),
         };
       })
     );
@@ -294,7 +295,7 @@ export class ProductService {
         return {
           tag,
           total,
-          products: products.map((p) => this.formatProduct(p)),
+          products: this.sortByDiscountPercent(products.map((p) => this.formatProduct(p))),
         };
       })
     );
@@ -323,11 +324,11 @@ export class ProductService {
           updatedAt: new Date(),
         },
         total: untaggedTotal,
-        products: untagged.map((p) => this.formatProduct(p)),
+        products: this.sortByDiscountPercent(untagged.map((p) => this.formatProduct(p))),
       });
     }
 
-    return { category, groups };
+    return { category, groups: groups.filter((g) => g.products.length > 0) };
   }
 
   async getRelatedByTag(productSlug: string, limit = 8) {
@@ -355,7 +356,17 @@ export class ProductService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return related.map((p) => this.formatProduct(p));
+    return this.sortByDiscountPercent(related.map((p) => this.formatProduct(p)));
+  }
+
+  private sortByDiscountPercent<T extends { discountPercent?: number; effectivePrice?: number }>(
+    products: T[]
+  ): T[] {
+    return [...products].sort((a, b) => {
+      const diff = (b.discountPercent ?? 0) - (a.discountPercent ?? 0);
+      if (diff !== 0) return diff;
+      return (a.effectivePrice ?? 0) - (b.effectivePrice ?? 0);
+    });
   }
 
   formatProductPublic(product: Parameters<ProductService['formatProduct']>[0]) {

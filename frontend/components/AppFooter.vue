@@ -2,6 +2,7 @@
 const { formatJalaliYear } = useFormat();
 
 const links = [
+  { to: '/contact', label: 'تماس با ما' },
   { to: '/pages/terms', label: 'قوانین و مقررات' },
   { to: '/profile/orders', label: 'پیگیری سفارش' },
   { to: '/auth/login', label: 'ورود' },

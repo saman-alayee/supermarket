@@ -39,7 +39,7 @@ const emit = defineEmits<{
   resolved: [address: string];
 }>();
 
-const { reverseGeocode } = useGeocoding();
+const { reverseGeocode, neshanRoutingLink } = useGeocoding();
 
 const mapContainer = ref<HTMLElement | null>(null);
 const locating = ref(false);
@@ -351,6 +351,16 @@ onUnmounted(() => {
       <p v-if="hasCoords()" class="text-[11px] text-gray-400" dir="ltr">
         {{ latitude?.toFixed(6) }}, {{ longitude?.toFixed(6) }}
       </p>
+      <a
+        v-if="hasCoords()"
+        :href="neshanRoutingLink(latitude!, longitude!)"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-xs text-primary-600 font-medium"
+      >
+        <AppIcon name="lucide:navigation" size="sm" />
+        مسیریابی با نشان
+      </a>
     </div>
 
     <p v-if="mapError" class="text-xs text-amber-600">{{ mapError }}</p>

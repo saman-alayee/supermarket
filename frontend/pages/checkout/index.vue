@@ -18,7 +18,16 @@ const form = reactive({
   notes: '',
   couponCode: '',
   paymentMethod: 'CASH_AT_DOOR' as PaymentMethod,
+  deliveryMethod: 'FREE' as 'FREE' | 'JET',
+  nationalId: '',
+  salaryCard: '',
+  taraId: '',
+  walletNote: '',
 });
+
+const showPaymentDetails = ref(false);
+const FREE_SHIPPING_MIN = 200_000;
+const JET_FEE = 50_000;
 
 const mapLat = ref<number | null>(null);
 const mapLng = ref<number | null>(null);
@@ -44,14 +53,76 @@ const paymentOptions: { value: PaymentMethod; label: string; hint?: string }[] =
   { value: 'OTHER_WALLET', label: PAYMENT_METHOD_LABELS.OTHER_WALLET },
 ];
 
-const displayTotal = computed(() => appliedCoupon.value?.totalPrice ?? cartStore.totalPrice);
+const displaySubtotal = computed(() => appliedCoupon.value?.totalPrice ?? cartStore.totalPrice);
+const deliveryFee = computed(() => (form.deliveryMethod === 'JET' ? JET_FEE : 0));
+const canUseFreeDelivery = computed(() => displaySubtotal.value >= FREE_SHIPPING_MIN);
+const displayTotal = computed(() => displaySubtotal.value + deliveryFee.value);
 const displayDiscount = computed(() => appliedCoupon.value?.discountAmount ?? 0);
 const selectedAddress = computed(() => addresses.value.find((a) => a.id === selectedAddressId.value) || null);
 const isInstallment = computed(() => form.paymentMethod !== 'CASH_AT_DOOR');
 
+watch(canUseFreeDelivery, (allowed) => {
+  if (!allowed && form.deliveryMethod === 'FREE') {
+    form.deliveryMethod = 'JET';
+  }
+});
+
+function buildPaymentDetails() {
+  if (!isInstallment.value) return undefined;
+  const details: Record<string, string> = {};
+  if (form.paymentMethod === 'RETIREMENT_FUND') {
+    if (form.nationalId.trim()) details.nationalId = form.nationalId.trim();
+    if (form.salaryCard.trim()) details.salaryCard = form.salaryCard.trim();
+  }
+  if (form.paymentMethod === 'SOCIAL_SECURITY' && form.nationalId.trim()) {
+    details.nationalId = form.nationalId.trim();
+  }
+  if (form.paymentMethod === 'TARA' && form.taraId.trim()) {
+    details.taraId = form.taraId.trim();
+  }
+  if (form.paymentMethod === 'OTHER_WALLET' && form.walletNote.trim()) {
+    details.walletNote = form.walletNote.trim();
+  }
+  return Object.keys(details).length ? details : undefined;
+}
+
+function validateInstallmentDetails() {
+  if (!isInstallment.value) return true;
+  if (form.paymentMethod === 'RETIREMENT_FUND' && (!form.nationalId.trim() || !form.salaryCard.trim())) {
+    error.value = 'کد ملی و شماره کارت حقوقی را وارد کنید';
+    showPaymentDetails.value = true;
+    return false;
+  }
+  if (form.paymentMethod === 'SOCIAL_SECURITY' && !form.nationalId.trim()) {
+    error.value = 'کد ملی را وارد کنید';
+    showPaymentDetails.value = true;
+    return false;
+  }
+  if (form.paymentMethod === 'TARA' && !form.taraId.trim()) {
+    error.value = 'شناسه خرید تارا را وارد کنید';
+    showPaymentDetails.value = true;
+    return false;
+  }
+  if (form.paymentMethod === 'OTHER_WALLET' && !form.walletNote.trim()) {
+    error.value = 'نوع کیف پول را بنویسید';
+    showPaymentDetails.value = true;
+    return false;
+  }
+  return true;
+}
+
+function scrollToFirstError() {
+  nextTick(() => {
+    document.querySelector('[data-field-error="true"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+}
+
 onMounted(async () => {
   await cartStore.fetchCart();
   if (cartStore.isEmpty) navigateTo('/cart');
+  if (cartStore.totalPrice < FREE_SHIPPING_MIN) {
+    form.deliveryMethod = 'JET';
+  }
 
   authStore.init();
   if (authStore.isLoggedIn) {
@@ -122,7 +193,13 @@ async function submitOrder() {
 
   let deliveryPayload: Record<string, unknown> = {};
 
-  if (checkoutMode.value === 'account' && authStore.isLoggedIn && selectedAddress.value) {
+  if (checkoutMode.value === 'account' && authStore.isLoggedIn) {
+    if (!selectedAddress.value) {
+      error.value = 'یک آدرس ذخیره‌شده انتخاب کنید';
+      toast.error(error.value);
+      scrollToFirstError();
+      return;
+    }
     deliveryPayload = {
       addressId: selectedAddress.value.id,
       deliveryAddress: selectedAddress.value.address,
@@ -133,6 +210,7 @@ async function submitOrder() {
     if (!validateAddress({ requireMap: true, hasMap: mapLat.value != null && mapLng.value != null })) {
       error.value = 'آدرس، پلاک، واحد و موقعیت روی نقشه را کامل کنید';
       toast.error(error.value);
+      scrollToFirstError();
       return;
     }
     deliveryPayload = {
@@ -140,6 +218,11 @@ async function submitOrder() {
       deliveryLatitude: mapLat.value,
       deliveryLongitude: mapLng.value,
     };
+  }
+
+  if (!validateInstallmentDetails()) {
+    toast.error(error.value);
+    return;
   }
 
   loading.value = true;
@@ -150,6 +233,8 @@ async function submitOrder() {
       notes: form.notes.trim() || undefined,
       couponCode: appliedCoupon.value?.code || undefined,
       paymentMethod: form.paymentMethod,
+      deliveryMethod: form.deliveryMethod,
+      paymentDetails: buildPaymentDetails(),
       ...deliveryPayload,
     };
 
@@ -178,6 +263,9 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
       </div>
       <div v-if="displayDiscount" class="flex justify-between text-sm text-green-600">
         <span>تخفیف</span><span>- {{ formatPrice(displayDiscount) }}</span>
+      </div>
+      <div v-if="deliveryFee" class="flex justify-between text-sm text-amber-700">
+        <span>هزینه ارسال جت</span><span>{{ formatPrice(deliveryFee) }}</span>
       </div>
       <div class="flex justify-between pt-2 border-t font-bold">
         <span>مبلغ قابل پرداخت</span>
@@ -212,7 +300,7 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
         <input v-model="form.customerPhone" type="tel" required pattern="09[0-9]{9}" class="input-field min-h-[48px]" dir="ltr" />
       </div>
 
-      <div v-if="checkoutMode === 'quick'" class="space-y-3">
+      <div v-if="checkoutMode === 'quick'" class="space-y-3" data-field-error="true">
         <AddressFields v-model:street="street" v-model:plaque="plaque" v-model:unit="unit" :errors="addressErrors" />
         <div>
           <label class="block text-sm font-medium mb-1">موقعیت روی نقشه (کیاشهر) *</label>
@@ -247,6 +335,28 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
       </div>
 
       <div class="card p-4 space-y-3">
+        <h2 class="text-sm font-bold text-gray-800">روش ارسال</h2>
+        <label
+          :class="['flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer', form.deliveryMethod === 'FREE' ? 'border-primary-500 bg-primary-50/40' : 'border-gray-100', !canUseFreeDelivery ? 'opacity-50 cursor-not-allowed' : '']"
+        >
+          <input v-model="form.deliveryMethod" type="radio" value="FREE" class="mt-1" :disabled="!canUseFreeDelivery" />
+          <span>
+            <span class="text-sm font-medium block text-green-700">ارسال رایگان</span>
+            <span class="text-xs text-gray-500">برای سفارش بالای ۲۰۰٬۰۰۰ تومان — زمان تقریبی ۲۰ تا ۹۰ دقیقه</span>
+          </span>
+        </label>
+        <label
+          :class="['flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer', form.deliveryMethod === 'JET' ? 'border-orange-500 bg-orange-50/50' : 'border-gray-100']"
+        >
+          <input v-model="form.deliveryMethod" type="radio" value="JET" class="mt-1" />
+          <span>
+            <span class="text-sm font-bold block text-orange-600">ارسال فوری (جت)</span>
+            <span class="text-xs text-gray-500">۵۰٬۰۰۰ تومان — زمان تقریبی ۱۵ تا ۳۰ دقیقه</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="card p-4 space-y-3">
         <h2 class="text-sm font-bold text-gray-800">نوع پرداخت</h2>
         <p class="text-xs text-gray-500 leading-relaxed">
           پرداخت در سایت انجام نمی‌شود. فقط گزینه را انتخاب کنید؛ فروشگاه بعد از ثبت سفارش، همین روش را در سیستم فروشگاه ثبت می‌کند.
@@ -261,9 +371,41 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
 
         <AppAlertBanner
           v-if="isInstallment"
-          message="سفارش با این نوع پرداخت در وضعیت «در حال بررسی» ثبت می‌شود تا فروشگاه آن را در سیستم خودش ثبت کند."
+          message="سفارش با این نوع پرداخت در وضعیت «در حال بررسی» ثبت می‌شود."
           variant="info"
         />
+
+        <button
+          v-if="isInstallment"
+          type="button"
+          class="w-full flex items-center justify-between p-3 rounded-xl border border-primary-200 bg-primary-50/40 text-sm"
+          @click="showPaymentDetails = !showPaymentDetails"
+        >
+          <span class="font-medium text-primary-700 inline-flex items-center gap-2">
+            <AppIcon name="lucide:file-text" size="sm" />
+            وارد کردن اطلاعات پرداخت
+          </span>
+          <AppIcon :name="showPaymentDetails ? 'lucide:chevron-up' : 'lucide:chevron-down'" size="sm" />
+        </button>
+
+        <div v-if="isInstallment && showPaymentDetails" class="space-y-3 pt-1">
+          <div v-if="form.paymentMethod === 'RETIREMENT_FUND' || form.paymentMethod === 'SOCIAL_SECURITY'">
+            <label class="block text-sm font-medium mb-1">کد ملی *</label>
+            <input v-model="form.nationalId" type="text" maxlength="10" class="input-field min-h-[44px]" dir="ltr" />
+          </div>
+          <div v-if="form.paymentMethod === 'RETIREMENT_FUND'">
+            <label class="block text-sm font-medium mb-1">شماره کارت حقوقی *</label>
+            <input v-model="form.salaryCard" type="text" class="input-field min-h-[44px]" dir="ltr" />
+          </div>
+          <div v-if="form.paymentMethod === 'TARA'">
+            <label class="block text-sm font-medium mb-1">شناسه خرید تارا *</label>
+            <input v-model="form.taraId" type="text" class="input-field min-h-[44px]" dir="ltr" />
+          </div>
+          <div v-if="form.paymentMethod === 'OTHER_WALLET'">
+            <label class="block text-sm font-medium mb-1">نوع کیف پول / توضیحات *</label>
+            <input v-model="form.walletNote" type="text" class="input-field min-h-[44px]" />
+          </div>
+        </div>
       </div>
 
       <div>

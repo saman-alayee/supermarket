@@ -30,6 +30,7 @@ const createOrderSchema = z
     notes: z.string().optional(),
     couponCode: z.string().optional(),
     paymentMethod: paymentMethodEnum.default('CASH_AT_DOOR'),
+    deliveryMethod: z.enum(['FREE', 'JET']).default('FREE'),
     paymentDetails: z.record(z.unknown()).optional(),
   })
   .refine(
