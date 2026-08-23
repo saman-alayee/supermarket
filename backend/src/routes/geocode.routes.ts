@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config';
-import { asyncHandler, successResponse, validateQuery } from '../utils/errors';
+import { asyncHandler, successResponse, validateQuery, AppError } from '../utils/errors';
 
 const router = Router();
 
@@ -105,10 +105,7 @@ router.get(
 
     const apiKey = config.neshanApiKey.trim();
     if (!apiKey) {
-      return res.status(503).json({
-        success: false,
-        message: 'Neshan API key is not configured',
-      });
+      throw new AppError(503, 'Neshan API key is not configured');
     }
 
     const params = new URLSearchParams({
@@ -125,10 +122,7 @@ router.get(
     });
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        success: false,
-        message: `Neshan direction HTTP ${response.status}`,
-      });
+      throw new AppError(response.status, `Neshan direction HTTP ${response.status}`);
     }
 
     const data = await response.json();
