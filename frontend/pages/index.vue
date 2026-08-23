@@ -124,7 +124,7 @@ useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
       v-if="topSliders?.length"
       :sliders="topSliders"
       variant="tiles"
-      height-class="h-[68px] sm:h-[76px] md:h-[88px]"
+      height-class="h-[120px] sm:h-[140px] md:h-[160px]"
       compact
     />
 
@@ -237,7 +237,7 @@ useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
         v-if="midSliders?.length && index === 1 && index < visibleCategorySections.length - 1"
         :sliders="midSliders"
         variant="carousel"
-        height-class="h-[52px] sm:h-[60px] md:h-[68px]"
+        height-class="h-[100px] sm:h-[120px] md:h-[140px]"
         compact
       />
     </template>

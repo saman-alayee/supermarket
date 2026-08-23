@@ -34,8 +34,8 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
 
     const delta = event.clientX - startX;
     if (Math.abs(delta) > 4) didDrag = true;
-    const rtl = getComputedStyle(el).direction === 'rtl';
-    el.scrollLeft = rtl ? startScrollLeft + delta : startScrollLeft - delta;
+    // Natural grab-scroll: content follows the pointer in both LTR and RTL containers.
+    el.scrollLeft = startScrollLeft - delta;
   }
 
   function onPointerUp(event: PointerEvent) {

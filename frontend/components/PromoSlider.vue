@@ -13,7 +13,7 @@ const props = withDefaults(
   {
     autoplayMs: 5000,
     variant: 'carousel',
-    heightClass: 'h-[72px] sm:h-[80px] md:h-[92px]',
+    heightClass: 'h-[120px] sm:h-[140px] md:h-[160px]',
     compact: false,
   }
 );
@@ -22,8 +22,43 @@ const { resolveMediaUrl } = useFormat();
 
 const activeIndex = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
-let touchStartX = 0;
-let touchStartY = 0;
+let dragStartX = 0;
+let dragStartY = 0;
+let isDragging = false;
+
+const SWIPE_THRESHOLD = 40;
+
+function handleSwipe(deltaX: number, deltaY: number) {
+  if (Math.abs(deltaX) <= SWIPE_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+  // RTL site: swipe right = next slide, swipe left = previous
+  goTo(activeIndex.value + (deltaX > 0 ? 1 : -1));
+}
+
+function onPointerDown(event: PointerEvent) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  isDragging = true;
+  stopAutoplay();
+  (event.currentTarget as HTMLElement | null)?.setPointerCapture(event.pointerId);
+}
+
+function onPointerUp(event: PointerEvent) {
+  if (!isDragging) return;
+  isDragging = false;
+  handleSwipe(event.clientX - dragStartX, event.clientY - dragStartY);
+  startAutoplay();
+  try {
+    (event.currentTarget as HTMLElement | null)?.releasePointerCapture(event.pointerId);
+  } catch {
+    // ignore
+  }
+}
+
+function onPointerCancel() {
+  isDragging = false;
+  startAutoplay();
+}
 
 const tileSliders = computed(() => props.sliders.slice(0, 3));
 
@@ -50,31 +85,6 @@ function stopAutoplay() {
     clearInterval(timer);
     timer = null;
   }
-}
-
-function onTouchStart(event: TouchEvent) {
-  const touch = event.touches[0];
-  if (!touch) return;
-  touchStartX = touch.clientX;
-  touchStartY = touch.clientY;
-  stopAutoplay();
-}
-
-function onTouchEnd(event: TouchEvent) {
-  const touch = event.changedTouches[0];
-  if (!touch) {
-    startAutoplay();
-    return;
-  }
-
-  const deltaX = touch.clientX - touchStartX;
-  const deltaY = touch.clientY - touchStartY;
-
-  if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
-    goTo(activeIndex.value + (deltaX > 0 ? -1 : 1));
-  }
-
-  startAutoplay();
 }
 
 watch(
@@ -123,8 +133,10 @@ onUnmounted(stopAutoplay);
       class="relative overflow-hidden rounded-xl bg-gray-100 shadow-sm ring-1 ring-black/5"
       @mouseenter="stopAutoplay"
       @mouseleave="startAutoplay"
-      @touchstart.passive="onTouchStart"
-      @touchend.passive="onTouchEnd"
+      @pointerdown="onPointerDown"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerCancel"
+      @pointerleave="onPointerCancel"
     >
       <div dir="ltr" :class="['relative w-full overflow-hidden', heightClass]">
         <div
