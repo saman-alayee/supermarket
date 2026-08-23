@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { useOrdersStore } from '~/stores/orders';
+
 const authStore = useAuthStore();
 const cartStore = useCartStore();
+const ordersStore = useOrdersStore();
 const route = useRoute();
 
 onMounted(() => {
   authStore.init();
   cartStore.fetchCart();
+  ordersStore.fetchCount();
 
   if (!authStore.isLoggedIn && route.path.startsWith('/profile') && route.path !== '/profile/favorites') {
     navigateTo(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`);

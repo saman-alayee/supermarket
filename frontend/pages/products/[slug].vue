@@ -61,97 +61,167 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
 </script>
 
 <template>
-  <div v-if="product" class="pb-28 max-w-lg mx-auto">
-    <div class="relative bg-white px-4 pt-4">
-      <button
-        type="button"
-        :class="[
-          'absolute top-5 end-5 z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm',
-          favorited ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-400',
-        ]"
-        @click="toggleFavorite(product.id)"
-      >
-        <AppIcon name="lucide:heart" size="md" :class="favorited ? 'fill-current' : ''" />
-      </button>
+  <div v-if="product" class="pb-28 md:pb-10">
+    <div class="max-w-6xl mx-auto px-4 py-4 md:py-8">
+      <div class="md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] md:gap-10 lg:gap-14 md:items-start">
+        <!-- Gallery -->
+        <div class="md:sticky md:top-20">
+          <div class="relative mx-auto w-full max-w-[420px] md:max-w-none">
+            <div class="relative aspect-square overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-100">
+              <img
+                :src="getProductImage(activeImage)"
+                :alt="product.name"
+                class="h-full w-full object-contain p-3 md:p-6"
+              />
+              <button
+                type="button"
+                :class="[
+                  'absolute top-3 end-3 z-10 flex h-10 w-10 items-center justify-center rounded-full shadow-md transition-colors',
+                  favorited ? 'bg-red-50 text-red-500' : 'bg-white/95 text-gray-400 hover:text-red-400',
+                ]"
+                @click="toggleFavorite(product.id)"
+              >
+                <AppIcon name="lucide:heart" size="md" :class="favorited ? 'fill-current' : ''" />
+              </button>
+              <span
+                v-if="product.discountPercent > 0"
+                class="absolute top-3 start-3 z-10 rounded-lg bg-red-500 px-2.5 py-1 text-xs font-bold text-white"
+              >
+                {{ product.discountPercent }}٪ تخفیف
+              </span>
+            </div>
 
-      <div class="flex items-start gap-4">
-        <div class="w-28 h-28 shrink-0 rounded-2xl bg-gray-50 overflow-hidden flex items-center justify-center">
-          <img
-            :src="getProductImage(activeImage)"
-            :alt="product.name"
-            class="w-full h-full object-contain p-2"
-          />
+            <div
+              v-if="galleryImages.length > 1"
+              class="mt-3 flex gap-2 overflow-x-auto scrollbar-hide px-0.5"
+            >
+              <button
+                v-for="(image, index) in galleryImages"
+                :key="`${image}-${index}`"
+                type="button"
+                :class="[
+                  'h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white md:h-[72px] md:w-[72px]',
+                  activeImageIndex === index ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-200',
+                ]"
+                @click="activeImageIndex = index"
+              >
+                <img
+                  :src="resolveMediaUrl(image)"
+                  :alt="`${product.name} ${index + 1}`"
+                  class="h-full w-full object-cover"
+                />
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="min-w-0 flex-1 pt-1">
-          <p v-if="product.tag?.name" class="text-xs text-primary-600 font-medium mb-1">
-            {{ product.tag.icon }} {{ product.tag.name }}
-          </p>
-          <h1 class="text-lg font-bold text-gray-800 leading-snug">{{ product.name }}</h1>
-          <p v-if="product.unit" class="text-xs text-gray-400 mt-1">{{ product.unit }}</p>
-        </div>
-      </div>
 
-      <div
-        v-if="galleryImages.length > 1"
-        class="flex gap-2 overflow-x-auto scrollbar-hide pt-3"
-      >
-        <button
-          v-for="(image, index) in galleryImages"
-          :key="`${image}-${index}`"
-          type="button"
-          :class="[
-            'w-14 h-14 shrink-0 rounded-xl border-2 overflow-hidden bg-white',
-            activeImageIndex === index ? 'border-primary-500' : 'border-gray-200',
-          ]"
-          @click="activeImageIndex = index"
-        >
-          <img
-            :src="resolveMediaUrl(image)"
-            :alt="`${product.name} ${index + 1}`"
-            class="w-full h-full object-contain p-1"
-          />
-        </button>
+        <!-- Details -->
+        <div class="mt-5 md:mt-0 flex flex-col min-w-0">
+          <div v-if="product.category?.name" class="mb-2">
+            <NuxtLink
+              v-if="product.category.slug"
+              :to="`/categories/${product.category.slug}`"
+              class="text-xs font-medium text-gray-500 hover:text-primary-600"
+            >
+              {{ product.category.name }}
+            </NuxtLink>
+          </div>
+
+          <div v-if="product.tag?.name" class="mb-2">
+            <NuxtLink
+              v-if="product.category?.slug && product.tag.slug"
+              :to="`/categories/${product.category.slug}?tag=${product.tag.slug}`"
+              class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100"
+            >
+              <span>{{ product.tag.icon }}</span>
+              {{ product.tag.name }}
+            </NuxtLink>
+            <p v-else class="text-xs font-medium text-primary-600">
+              {{ product.tag.icon }} {{ product.tag.name }}
+            </p>
+          </div>
+
+          <h1 class="text-xl md:text-2xl lg:text-[1.65rem] font-bold text-gray-900 leading-snug">
+            {{ product.name }}
+          </h1>
+          <p v-if="product.unit" class="mt-1.5 text-sm text-gray-400">{{ product.unit }}</p>
+
+          <div class="mt-5 rounded-2xl border border-gray-100 bg-white p-4 md:p-5 shadow-sm">
+            <div class="flex flex-wrap items-end gap-x-3 gap-y-1">
+              <p class="text-2xl md:text-3xl font-bold text-gray-900">
+                {{ formatPrice(product.effectivePrice) }}
+              </p>
+              <p v-if="product.discountPrice" class="text-sm md:text-base text-gray-400 line-through pb-0.5">
+                {{ formatPrice(product.price) }}
+              </p>
+            </div>
+
+            <p v-if="product.inStock" class="mt-2 text-sm font-medium text-green-600">موجود در انبار</p>
+            <p v-else class="mt-2 text-sm font-medium text-red-500">ناموجود</p>
+
+            <!-- Desktop purchase -->
+            <div v-if="product.inStock" class="hidden md:block mt-5 pt-5 border-t border-gray-100">
+              <div v-if="quantity === 0" class="flex gap-3">
+                <button class="btn-primary flex-1 min-h-[48px]" @click="cartStore.addItem(product.id)">
+                  افزودن به سبد
+                </button>
+                <button class="btn-secondary flex-1 min-h-[48px]" @click="buyNow">
+                  خرید و پرداخت
+                </button>
+              </div>
+              <div v-else class="flex items-center gap-3">
+                <div class="flex flex-1 items-center justify-center gap-4 rounded-xl bg-primary-50 px-4 py-2.5">
+                  <button
+                    type="button"
+                    class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-primary-600 shadow-sm"
+                    @click="quantity <= 1 ? cartStore.removeItem(product.id) : cartStore.updateQuantity(product.id, quantity - 1)"
+                  >
+                    <AppIcon name="lucide:minus" size="md" />
+                  </button>
+                  <span class="min-w-[2rem] text-center text-xl font-bold text-primary-700">{{ quantity }}</span>
+                  <button
+                    type="button"
+                    class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-600 text-white shadow-sm"
+                    @click="cartStore.updateQuantity(product.id, quantity + 1)"
+                  >
+                    <AppIcon name="lucide:plus" size="md" />
+                  </button>
+                </div>
+                <button type="button" class="btn-primary shrink-0 min-h-[48px] px-6" @click="navigateTo('/checkout')">
+                  تسویه حساب
+                </button>
+              </div>
+            </div>
+
+            <div v-else class="hidden md:block mt-5 pt-5 border-t border-gray-100">
+              <button type="button" class="btn-secondary w-full min-h-[48px] opacity-70 cursor-not-allowed" disabled>
+                اتمام موجودی
+              </button>
+            </div>
+          </div>
+
+          <div v-if="product.description" class="mt-6">
+            <h2 class="text-sm font-bold text-gray-800 mb-2">توضیحات</h2>
+            <p class="text-sm md:text-[15px] text-gray-600 leading-relaxed whitespace-pre-line">
+              {{ product.description }}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="px-4 py-4">
-      <p v-if="product.description" class="text-sm text-gray-600 mb-4 leading-relaxed">
-        {{ product.description }}
-      </p>
-
-      <div class="flex items-end gap-3 mb-2">
-        <p v-if="product.discountPrice" class="text-sm text-gray-400 line-through">
-          {{ formatPrice(product.price) }}
-        </p>
-        <p class="text-2xl font-bold text-gray-800">{{ formatPrice(product.effectivePrice) }}</p>
-        <span
-          v-if="product.discountPercent > 0"
-          class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg"
-        >
-          {{ product.discountPercent }}٪ تخفیف
-        </span>
-      </div>
-
-      <p v-if="product.inStock" class="text-sm text-green-600">موجود در انبار</p>
-      <p v-else class="text-sm text-red-500">ناموجود</p>
-    </div>
-
-    <section v-if="relatedProducts.length" class="px-4 pb-4">
+    <section v-if="relatedProducts.length" class="max-w-6xl mx-auto px-4 pb-6 mt-2 md:mt-4">
       <h2 class="section-title">
         {{ product.tag?.name ? `سایر ${product.tag.name}` : 'محصولات مرتبط' }}
       </h2>
-      <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
-        <div
-          v-for="item in relatedProducts"
-          :key="item.id"
-          class="w-[44%] sm:w-[32%] md:w-[24%] shrink-0"
-        >
-          <ProductCard :product="item" />
-        </div>
-      </div>
+      <ProductCardList :products="relatedProducts" layout="strip" />
     </section>
 
-    <div v-if="product.inStock" class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100">
+    <!-- Mobile fixed bar -->
+    <div
+      v-if="product.inStock"
+      class="md:hidden fixed bottom-16 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100"
+    >
       <div class="max-w-lg mx-auto">
         <div v-if="quantity === 0" class="flex gap-2">
           <button class="btn-primary flex-1 min-h-[52px]" @click="cartStore.addItem(product.id)">
@@ -161,19 +231,26 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
             خرید و پرداخت
           </button>
         </div>
-        <div v-else class="flex items-center justify-center gap-4 bg-primary-50 rounded-2xl p-3">
-          <button
-            class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary-600 shadow-sm"
-            @click="quantity <= 1 ? cartStore.removeItem(product.id) : cartStore.updateQuantity(product.id, quantity - 1)"
-          >
-            <AppIcon name="lucide:minus" size="md" />
-          </button>
-          <span class="text-xl font-bold text-primary-700 w-8 text-center">{{ quantity }}</span>
-          <button
-            class="w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center text-white shadow-sm"
-            @click="cartStore.updateQuantity(product.id, quantity + 1)"
-          >
-            <AppIcon name="lucide:plus" size="md" />
+        <div v-else class="flex items-center gap-2">
+          <div class="flex flex-1 items-center justify-center gap-3 rounded-2xl bg-primary-50 p-3">
+            <button
+              type="button"
+              class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-primary-600 shadow-sm"
+              @click="quantity <= 1 ? cartStore.removeItem(product.id) : cartStore.updateQuantity(product.id, quantity - 1)"
+            >
+              <AppIcon name="lucide:minus" size="md" />
+            </button>
+            <span class="w-8 text-center text-xl font-bold text-primary-700">{{ quantity }}</span>
+            <button
+              type="button"
+              class="flex h-11 w-11 items-center justify-center rounded-full bg-primary-600 text-white shadow-sm"
+              @click="cartStore.updateQuantity(product.id, quantity + 1)"
+            >
+              <AppIcon name="lucide:plus" size="md" />
+            </button>
+          </div>
+          <button type="button" class="btn-primary shrink-0 min-h-[52px] px-4" @click="navigateTo('/checkout')">
+            تسویه حساب
           </button>
         </div>
       </div>
@@ -181,7 +258,7 @@ useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
 
     <div
       v-else
-      class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100"
+      class="md:hidden fixed bottom-16 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t border-gray-100"
     >
       <div class="max-w-lg mx-auto">
         <button type="button" class="btn-secondary w-full min-h-[52px] opacity-70 cursor-not-allowed" disabled>

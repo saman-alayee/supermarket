@@ -30,6 +30,14 @@ useHead({ title: 'تماس با ما - KIAA KALA' });
           <AppIcon name="lucide:map-pin" size="sm" />
           مشاهده روی نقشه نشان
         </a>
+        <AppMapPicker
+          :latitude="37.4255"
+          :longitude="49.953"
+          readonly
+          height="200px"
+          :zoom="16"
+          class="mt-3"
+        />
       </div>
 
       <div v-for="phone in phones" :key="phone.href" class="border-t border-gray-100 pt-3">

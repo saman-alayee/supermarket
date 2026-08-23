@@ -2,7 +2,7 @@
 import type { Order, OrderStatus, Pagination } from '~/types';
 import { ORDER_STATUS_LABELS } from '~/types';
 
-definePageMeta({ layout: 'profile' });
+definePageMeta({ layout: 'profile', middleware: 'auth' });
 
 const api = useApi();
 const { formatPrice, formatShortDate } = useFormat();

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Address, PaymentMethod } from '~/types';
 import { PAYMENT_METHOD_LABELS } from '~/types';
+import { useOrdersStore } from '~/stores/orders';
 
 const cartStore = useCartStore();
+const ordersStore = useOrdersStore();
 const authStore = useAuthStore();
 const api = useApi();
 const toast = useToast();
@@ -23,7 +25,12 @@ const form = reactive({
   salaryCard: '',
   taraId: '',
   walletNote: '',
+  socialSecurityOtp: '',
 });
+
+const socialSecurityOtpSending = ref(false);
+const socialSecurityOtpSent = ref(false);
+const socialSecurityOtpDevCode = ref('');
 
 const showPaymentDetails = ref(false);
 const FREE_SHIPPING_MIN = 200_000;
@@ -45,13 +52,49 @@ const appliedCoupon = ref<{
   totalPrice: number;
 } | null>(null);
 
-const paymentOptions: { value: PaymentMethod; label: string; hint?: string }[] = [
+const paymentOptions: { value: PaymentMethod; label: string; hint?: string; info?: string }[] = [
   { value: 'CASH_AT_DOOR', label: PAYMENT_METHOD_LABELS.CASH_AT_DOOR, hint: 'مبلغ هنگام تحویل دریافت می‌شود' },
-  { value: 'RETIREMENT_FUND', label: PAYMENT_METHOD_LABELS.RETIREMENT_FUND },
-  { value: 'SOCIAL_SECURITY', label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY },
-  { value: 'TARA', label: PAYMENT_METHOD_LABELS.TARA },
-  { value: 'OTHER_WALLET', label: PAYMENT_METHOD_LABELS.OTHER_WALLET },
+  {
+    value: 'RETIREMENT_FUND',
+    label: PAYMENT_METHOD_LABELS.RETIREMENT_FUND,
+    info: 'کد ملی و شماره کارت حقوقی را وارد کنید تا در سیستم فروشگاه ثبت شود.',
+  },
+  {
+    value: 'SOCIAL_SECURITY',
+    label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY,
+    info: 'کد ملی بازنشسته و کد تأیید پیامکی را وارد کنید تا در سیستم فروشگاه ثبت شود.',
+  },
+  {
+    value: 'TARA',
+    label: PAYMENT_METHOD_LABELS.TARA,
+    info: 'شناسه خرید تارا را وارد کنید تا سفارش در سیستم فروشگاه ثبت شود.',
+  },
+  {
+    value: 'OTHER_WALLET',
+    label: PAYMENT_METHOD_LABELS.OTHER_WALLET,
+    info: 'نوع کیف پول یا توضیحات پرداخت را بنویسید.',
+  },
 ];
+
+const installmentMethods: PaymentMethod[] = ['RETIREMENT_FUND', 'SOCIAL_SECURITY', 'TARA', 'OTHER_WALLET'];
+
+function selectPaymentMethod(method: PaymentMethod) {
+  form.paymentMethod = method;
+  if (method !== 'CASH_AT_DOOR') {
+    showPaymentDetails.value = true;
+  }
+  if (method !== 'SOCIAL_SECURITY') {
+    form.socialSecurityOtp = '';
+    socialSecurityOtpSent.value = false;
+    socialSecurityOtpDevCode.value = '';
+  }
+}
+
+function openPaymentInfo(method: PaymentMethod, event?: Event) {
+  event?.stopPropagation();
+  form.paymentMethod = method;
+  showPaymentDetails.value = true;
+}
 
 const displaySubtotal = computed(() => appliedCoupon.value?.totalPrice ?? cartStore.totalPrice);
 const deliveryFee = computed(() => (form.deliveryMethod === 'JET' ? JET_FEE : 0));
@@ -74,8 +117,9 @@ function buildPaymentDetails() {
     if (form.nationalId.trim()) details.nationalId = form.nationalId.trim();
     if (form.salaryCard.trim()) details.salaryCard = form.salaryCard.trim();
   }
-  if (form.paymentMethod === 'SOCIAL_SECURITY' && form.nationalId.trim()) {
-    details.nationalId = form.nationalId.trim();
+  if (form.paymentMethod === 'SOCIAL_SECURITY') {
+    if (form.nationalId.trim()) details.nationalId = form.nationalId.trim();
+    if (form.socialSecurityOtp.trim()) details.otpCode = form.socialSecurityOtp.trim();
   }
   if (form.paymentMethod === 'TARA' && form.taraId.trim()) {
     details.taraId = form.taraId.trim();
@@ -93,10 +137,23 @@ function validateInstallmentDetails() {
     showPaymentDetails.value = true;
     return false;
   }
-  if (form.paymentMethod === 'SOCIAL_SECURITY' && !form.nationalId.trim()) {
-    error.value = 'کد ملی را وارد کنید';
-    showPaymentDetails.value = true;
-    return false;
+  if (form.paymentMethod === 'SOCIAL_SECURITY') {
+    if (!form.nationalId.trim()) {
+      error.value = 'کد ملی را وارد کنید';
+      showPaymentDetails.value = true;
+      return false;
+    }
+    if (!/^09\d{9}$/.test(form.customerPhone.trim())) {
+      error.value = 'برای تأیید تامین اجتماعی، شماره موبایل معتبر وارد کنید';
+      showPaymentDetails.value = true;
+      return false;
+    }
+    if (!form.socialSecurityOtp.trim()) {
+      error.value = 'کد تأیید پیامکی را وارد کنید';
+      showPaymentDetails.value = true;
+      return false;
+    }
+    return true;
   }
   if (form.paymentMethod === 'TARA' && !form.taraId.trim()) {
     error.value = 'شناسه خرید تارا را وارد کنید';
@@ -153,6 +210,29 @@ function switchToAccount() {
   checkoutMode.value = 'account';
   if (!authStore.isLoggedIn) {
     navigateTo(`/auth/login?redirect=${encodeURIComponent('/checkout')}`);
+  }
+}
+
+async function sendSocialSecurityOtp() {
+  if (!/^09\d{9}$/.test(form.customerPhone.trim())) {
+    error.value = 'ابتدا شماره موبایل معتبر وارد کنید';
+    toast.error(error.value);
+    return;
+  }
+  socialSecurityOtpSending.value = true;
+  error.value = '';
+  try {
+    const { data } = await api.post<{ message: string; devCode?: string }>('/auth/send-otp', {
+      phone: form.customerPhone.trim(),
+    });
+    socialSecurityOtpSent.value = true;
+    socialSecurityOtpDevCode.value = data.devCode || '';
+    toast.success('کد تأیید ارسال شد');
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'خطا در ارسال کد تأیید';
+    toast.error(error.value);
+  } finally {
+    socialSecurityOtpSending.value = false;
   }
 }
 
@@ -240,6 +320,7 @@ async function submitOrder() {
 
     const { data } = await api.post<{ orderNumber: string }>('/orders', payload);
     await cartStore.fetchCart();
+    await ordersStore.fetchCount();
     navigateTo(`/orders/success?number=${data.orderNumber}`);
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'خطا در ثبت سفارش';
@@ -253,7 +334,7 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
 </script>
 
 <template>
-  <div class="px-4 py-4 max-w-lg mx-auto pb-40">
+  <div class="px-4 py-4 max-w-lg md:max-w-2xl mx-auto pb-44 md:pb-32">
     <h1 class="section-title">ثبت سفارش</h1>
 
     <div class="card p-4 mb-4 space-y-2">
@@ -361,11 +442,31 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
         <p class="text-xs text-gray-500 leading-relaxed">
           پرداخت در سایت انجام نمی‌شود. فقط گزینه را انتخاب کنید؛ فروشگاه بعد از ثبت سفارش، همین روش را در سیستم فروشگاه ثبت می‌کند.
         </p>
-        <label v-for="opt in paymentOptions" :key="opt.value" class="flex items-start gap-3 cursor-pointer">
-          <input v-model="form.paymentMethod" type="radio" :value="opt.value" class="mt-1" />
-          <span>
-            <span class="text-sm font-medium block">{{ opt.label }}</span>
-            <span v-if="opt.hint" class="text-xs text-gray-400">{{ opt.hint }}</span>
+        <label
+          v-for="opt in paymentOptions"
+          :key="opt.value"
+          class="flex items-start gap-3 cursor-pointer rounded-xl border p-3 transition-colors"
+          :class="form.paymentMethod === opt.value ? 'border-primary-400 bg-primary-50/30' : 'border-gray-100'"
+          @click="selectPaymentMethod(opt.value)"
+        >
+          <input v-model="form.paymentMethod" type="radio" :value="opt.value" class="mt-1" @click.stop />
+          <span class="flex-1 min-w-0">
+            <span class="flex items-center gap-2">
+              <span class="text-sm font-medium">{{ opt.label }}</span>
+              <button
+                v-if="installmentMethods.includes(opt.value)"
+                type="button"
+                class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-primary-700 hover:bg-primary-200"
+                aria-label="راهنمای اطلاعات پرداخت"
+                @click="openPaymentInfo(opt.value, $event)"
+              >
+                <AppIcon name="lucide:info" size="sm" />
+              </button>
+            </span>
+            <span v-if="opt.hint" class="text-xs text-gray-400 block mt-0.5">{{ opt.hint }}</span>
+            <span v-else-if="opt.info && form.paymentMethod === opt.value" class="text-xs text-gray-500 block mt-1 leading-relaxed">
+              {{ opt.info }}
+            </span>
           </span>
         </label>
 
@@ -397,6 +498,34 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
             <label class="block text-sm font-medium mb-1">شماره کارت حقوقی *</label>
             <input v-model="form.salaryCard" type="text" class="input-field min-h-[44px]" dir="ltr" />
           </div>
+          <div v-if="form.paymentMethod === 'SOCIAL_SECURITY'" class="space-y-3 pt-1 border-t border-gray-100">
+            <p class="text-xs text-gray-500 leading-relaxed">
+              برای ثبت سفارش با تامین اجتماعی، کد تأیید به شماره موبایل شما ارسال می‌شود.
+            </p>
+            <button
+              type="button"
+              class="btn-secondary w-full min-h-[44px]"
+              :disabled="socialSecurityOtpSending"
+              @click="sendSocialSecurityOtp"
+            >
+              {{ socialSecurityOtpSending ? 'در حال ارسال...' : socialSecurityOtpSent ? 'ارسال مجدد کد' : 'ارسال کد تأیید' }}
+            </button>
+            <div>
+              <label class="block text-sm font-medium mb-1">کد تأیید پیامکی *</label>
+              <input
+                v-model="form.socialSecurityOtp"
+                type="text"
+                maxlength="6"
+                inputmode="numeric"
+                class="input-field min-h-[44px]"
+                dir="ltr"
+                placeholder="۶ رقم"
+              />
+            </div>
+            <p v-if="socialSecurityOtpDevCode" class="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              کد تست: {{ socialSecurityOtpDevCode }}
+            </p>
+          </div>
           <div v-if="form.paymentMethod === 'TARA'">
             <label class="block text-sm font-medium mb-1">شناسه خرید تارا *</label>
             <input v-model="form.taraId" type="text" class="input-field min-h-[44px]" dir="ltr" />
@@ -416,10 +545,10 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
       <AppAlertBanner v-if="error" :message="error" />
     </form>
 
-    <div class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 bg-white/95 backdrop-blur border-t">
-      <div v-if="error" class="max-w-lg mx-auto mb-2 md:hidden"><AppAlertBanner :message="error" /></div>
-      <div class="max-w-lg mx-auto">
-        <button type="button" class="btn-primary w-full min-h-[52px]" :disabled="loading" @click="submitOrder">
+    <div class="fixed bottom-16 md:bottom-0 inset-x-0 z-[55] border-t bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur">
+      <div v-if="error" class="mx-auto mb-2 max-w-lg md:max-w-2xl md:hidden"><AppAlertBanner :message="error" /></div>
+      <div class="mx-auto max-w-lg md:max-w-2xl">
+        <button type="button" class="btn-primary btn-action w-full" :disabled="loading" @click="submitOrder">
           {{ loading ? 'در حال ثبت...' : `ثبت سفارش • ${formatPrice(displayTotal)}` }}
         </button>
       </div>

@@ -16,6 +16,11 @@ export function formatPrice(price: number): string {
   return `${formatNumber(price)} تومان`;
 }
 
+/** Compact price for small product cards (number only). */
+export function formatPriceCompact(price: number): string {
+  return formatNumber(price);
+}
+
 export function formatDate(date: string | Date): string {
   return formatJalaliDate(date, { withTime: true });
 }
@@ -53,6 +58,7 @@ export function useFormat() {
     toPersianDigits,
     formatNumber,
     formatPrice,
+    formatPriceCompact,
     formatDate,
     formatShortDate,
     formatJalaliYear,

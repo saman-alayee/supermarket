@@ -86,6 +86,21 @@ function handleSearch() {
         </form>
       </div>
 
+      <nav class="md:hidden flex gap-2 overflow-x-auto scrollbar-hide pb-2.5 text-xs font-medium">
+        <NuxtLink to="/search?discounted=1" class="shrink-0 px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-100">
+          تخفیف‌دار
+        </NuxtLink>
+        <NuxtLink to="/search?featured=1" class="shrink-0 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 border border-primary-100">
+          پیشنهاد ویژه
+        </NuxtLink>
+        <NuxtLink to="/categories" class="shrink-0 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
+          دسته‌بندی‌ها
+        </NuxtLink>
+        <NuxtLink to="/contact" class="shrink-0 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
+          تماس با ما
+        </NuxtLink>
+      </nav>
+
       <nav class="hidden md:flex items-center gap-6 pb-3 text-sm text-gray-600">
         <NuxtLink to="/" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
           <AppIcon name="lucide:home" size="sm" />
@@ -99,11 +114,11 @@ function handleSearch() {
           <AppIcon name="lucide:package-search" size="sm" />
           پیگیری سفارش
         </NuxtLink>
-        <NuxtLink to="/?section=featured" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
+        <NuxtLink to="/search?featured=1" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
           <AppIcon name="lucide:sparkles" size="sm" />
           پیشنهادهای ویژه
         </NuxtLink>
-        <NuxtLink to="/?section=discounted" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
+        <NuxtLink to="/search?discounted=1" class="hover:text-primary-600 transition-colors flex items-center gap-1.5">
           <AppIcon name="lucide:percent" size="sm" />
           تخفیف‌دار
         </NuxtLink>

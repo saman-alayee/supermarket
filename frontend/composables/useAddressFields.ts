@@ -76,11 +76,18 @@ export function useAddressFields() {
   }
 
   function payload(extra?: { title?: string; latitude?: number | null; longitude?: number | null; isDefault?: boolean }) {
+    const streetVal = street.value.trim();
+    const plaqueVal = plaque.value.trim();
+    const unitVal = unit.value.trim();
+    const composed = composeAddress(streetVal, plaqueVal, unitVal);
+
     return {
       ...extra,
-      address: composeAddress(street.value, plaque.value, unit.value),
-      plaque: plaque.value.trim(),
-      unit: unit.value.trim(),
+      street: streetVal,
+      plaque: plaqueVal,
+      unit: unitVal,
+      deliveryAddress: composed,
+      address: composed,
     };
   }
 

@@ -22,9 +22,9 @@ const sizeClasses = {
     text: 'text-xs',
   },
   lg: {
-    wrap: 'min-w-[88px]',
-    box: 'w-[88px] h-[88px] rounded-2xl',
-    text: 'text-sm',
+    wrap: 'min-w-[80px]',
+    box: 'w-[80px] h-[80px] rounded-2xl',
+    text: 'text-xs',
   },
 };
 </script>
@@ -32,7 +32,7 @@ const sizeClasses = {
 <template>
   <NuxtLink
     :to="`/categories/${category.slug}`"
-    :class="['flex flex-col items-center gap-2 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
+    :class="['flex flex-col items-center gap-1.5 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
   >
     <div
       :class="[

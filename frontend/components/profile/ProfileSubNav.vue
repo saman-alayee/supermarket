@@ -10,6 +10,7 @@ const navItems = [
   { to: '/profile/orders', label: 'سفارش‌ها', icon: 'lucide:package' },
   { to: '/profile/notifications', label: 'اعلان‌ها', icon: 'lucide:bell', badge: true },
   { to: '/profile/addresses', label: 'آدرس‌ها', icon: 'lucide:map-pin' },
+  { to: '/profile/password', label: 'رمز عبور', icon: 'lucide:key-round' },
   { to: '/profile/edit', label: 'تنظیمات', icon: 'lucide:settings' },
 ];
 

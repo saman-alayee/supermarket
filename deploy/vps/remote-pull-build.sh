@@ -81,6 +81,7 @@ NODE
 echo "==> Frontend generate"
 cd "$REPO_DIR/frontend"
 export NUXT_PUBLIC_API_BASE="/api"
+if [ -f .env.production ]; then set -a; . ./.env.production; set +a; fi
 npm ci
 npm run generate
 

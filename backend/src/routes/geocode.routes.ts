@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { config } from '../config';
 import { asyncHandler, successResponse, validateQuery } from '../utils/errors';
 
 const router = Router();
@@ -77,6 +78,61 @@ router.get(
         fallback: true,
       });
     }
+  })
+);
+
+router.get(
+  '/direction',
+  validateQuery(
+    z.object({
+      originLat: z.coerce.number().min(-90).max(90),
+      originLng: z.coerce.number().min(-180).max(180),
+      destLat: z.coerce.number().min(-90).max(90),
+      destLng: z.coerce.number().min(-180).max(180),
+      type: z.enum(['car', 'motorcycle']).optional().default('car'),
+    })
+  ),
+  asyncHandler(async (req, res) => {
+    const query = (req as typeof req & {
+      validatedQuery: {
+        originLat: number;
+        originLng: number;
+        destLat: number;
+        destLng: number;
+        type: 'car' | 'motorcycle';
+      };
+    }).validatedQuery;
+
+    const apiKey = config.neshanApiKey.trim();
+    if (!apiKey) {
+      return res.status(503).json({
+        success: false,
+        message: 'Neshan API key is not configured',
+      });
+    }
+
+    const params = new URLSearchParams({
+      type: query.type,
+      origin: `${query.originLat},${query.originLng}`,
+      destination: `${query.destLat},${query.destLng}`,
+      alternative: 'false',
+    });
+
+    const response = await fetch(`https://api.neshan.org/v4/direction?${params.toString()}`, {
+      headers: {
+        'Api-Key': apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        success: false,
+        message: `Neshan direction HTTP ${response.status}`,
+      });
+    }
+
+    const data = await response.json();
+    successResponse(res, data);
   })
 );
 

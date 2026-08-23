@@ -1,20 +1,6 @@
 <script setup lang="ts">
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
-const DefaultIcon = L.icon({
-  iconUrl,
-  iconRetinaUrl,
-  shadowUrl,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-L.Marker.prototype.options.icon = DefaultIcon;
+import type { Map as LeafletMap, Marker, LayerGroup } from 'leaflet';
+import { loadNeshanLeaflet, NESHAN_OSM_FALLBACK } from '~/composables/useNeshanLeaflet';
 
 const props = withDefaults(
   defineProps<{
@@ -24,12 +10,16 @@ const props = withDefaults(
     geocode?: boolean;
     height?: string;
     zoom?: number;
+    showRoute?: boolean;
+    routeOriginLat?: number;
+    routeOriginLng?: number;
   }>(),
   {
     readonly: false,
     geocode: false,
     height: '320px',
     zoom: 16,
+    showRoute: false,
   }
 );
 
@@ -39,84 +29,103 @@ const emit = defineEmits<{
   resolved: [address: string];
 }>();
 
+const config = useRuntimeConfig();
 const { reverseGeocode, neshanRoutingLink } = useGeocoding();
+const { DEFAULT_ORIGIN, fetchNeshanDirection, drawNeshanRouteOnMap, fitMapToRoute } = useNeshanRoute();
 
+const mapId = `neshan-map-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 const mapContainer = ref<HTMLElement | null>(null);
 const locating = ref(false);
 const resolving = ref(false);
+const mapLoading = ref(true);
 const mapError = ref('');
 
-/** کیاشهر، گیلان */
-const KIASHAHR_CENTER = L.latLng(37.4255, 49.953);
-const KIASHAHR_BOUNDS = L.latLngBounds([37.32, 49.82], [37.53, 50.1]);
+const KIASHAHR = { lat: 37.4255, lng: 49.953 };
 
-let map: L.Map | null = null;
-let marker: L.Marker | null = null;
+let L: typeof import('leaflet') | null = null;
+let map: LeafletMap | null = null;
+let marker: Marker | null = null;
+let routeLayer: LayerGroup | null = null;
 let geocodeTimer: ReturnType<typeof setTimeout> | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let syncingFromProps = false;
 let lastGeocodeKey = '';
 let geocodeRequestId = 0;
+let fallbackApplied = false;
+
+const neshanKey = computed(() => String(config.public.neshanApiKey || '').trim());
 
 function hasCoords(): boolean {
   return props.latitude != null && Number.isFinite(props.latitude)
     && props.longitude != null && Number.isFinite(props.longitude);
 }
 
+function routeOrigin() {
+  return {
+    lat: props.routeOriginLat ?? DEFAULT_ORIGIN.lat,
+    lng: props.routeOriginLng ?? DEFAULT_ORIGIN.lng,
+  };
+}
+
 function roundCoord(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-function addTiles(target: L.Map) {
-  const sources = [
-    {
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-      options: {
-        subdomains: 'abcd',
-        maxZoom: 19,
-        maxNativeZoom: 19,
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-      },
-    },
-    {
-      url: 'https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png',
-      options: {
-        maxZoom: 19,
-        maxNativeZoom: 18,
-        attribution: '&copy; OpenStreetMap',
-      },
-    },
-    {
-      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      options: {
-        maxZoom: 19,
-        maxNativeZoom: 19,
-        attribution: '&copy; OpenStreetMap',
-      },
-    },
-  ];
+function setupMarkerIcon(leaflet: typeof import('leaflet')) {
+  const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+  const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
+  const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
+  const DefaultIcon = leaflet.icon({
+    iconUrl,
+    iconRetinaUrl,
+    shadowUrl,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+  });
+  leaflet.Marker.prototype.options.icon = DefaultIcon;
+}
 
-  let sourceIndex = 0;
-  let layer: L.TileLayer | null = null;
-  let errors = 0;
+function getStartCoords(): { lat: number; lng: number } {
+  if (hasCoords()) {
+    const lat = props.latitude!;
+    const lng = props.longitude!;
+    if (props.readonly) return { lat, lng };
+    return clampToDeliveryArea(lat, lng);
+  }
+  return { ...KIASHAHR };
+}
 
-  const useSource = (index: number) => {
-    const source = sources[index];
-    if (!source) return;
-    if (layer) target.removeLayer(layer);
-    layer = L.tileLayer(source.url, source.options);
-    layer.on('tileerror', () => {
-      errors += 1;
-      if (errors >= 6 && sourceIndex < sources.length - 1) {
-        errors = 0;
-        sourceIndex += 1;
-        useSource(sourceIndex);
+function clampToDeliveryArea(lat: number, lng: number): { lat: number; lng: number } {
+  if (!L) return { lat, lng };
+  const bounds = L.latLngBounds([37.32, 49.82], [37.53, 50.1]);
+  const point = L.latLng(lat, lng);
+  if (bounds.contains(point)) return { lat, lng };
+  const center = bounds.pad(-0.15).getCenter();
+  return { lat: center.lat, lng: center.lng };
+}
+
+function applyOsmFallback() {
+  if (!map || fallbackApplied) return;
+  const mapWithType = map as LeafletMap & { setMapType?: (type: string) => void };
+  if (typeof mapWithType.setMapType === 'function') {
+    mapWithType.setMapType(NESHAN_OSM_FALLBACK);
+    fallbackApplied = true;
+  }
+}
+
+function ensureTilesVisible() {
+  setTimeout(() => {
+    const root = document.getElementById(mapId);
+    const hasTile = root?.querySelector('.leaflet-tile-loaded');
+    if (!hasTile) {
+      applyOsmFallback();
+      if (!fallbackApplied) {
+        mapError.value = 'نقشه نشان بارگذاری نشد. کلید «نقشه وب» را در پنل نشان بررسی کنید.';
       }
-    });
-    layer.addTo(target);
-  };
-
-  useSource(0);
+    }
+  }, 3500);
 }
 
 async function resolveAddress(lat: number, lng: number) {
@@ -139,9 +148,7 @@ async function resolveAddress(lat: number, lng: number) {
     lastGeocodeKey = key;
     emit('resolved', `موقعیت: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
   } finally {
-    if (requestId === geocodeRequestId) {
-      resolving.value = false;
-    }
+    if (requestId === geocodeRequestId) resolving.value = false;
   }
 }
 
@@ -156,9 +163,7 @@ function emitCoords(lat: number, lng: number) {
   const roundedLng = roundCoord(lng);
   emit('update:latitude', roundedLat);
   emit('update:longitude', roundedLng);
-  if (props.geocode) {
-    scheduleResolve(roundedLat, roundedLng);
-  }
+  if (props.geocode) scheduleResolve(roundedLat, roundedLng);
 }
 
 function updateFromCenter() {
@@ -167,25 +172,53 @@ function updateFromCenter() {
   emitCoords(center.lat, center.lng);
 }
 
-function clampToDeliveryArea(lat: number, lng: number): L.LatLng {
-  const point = L.latLng(lat, lng);
-  if (KIASHAHR_BOUNDS.contains(point)) return point;
-  return KIASHAHR_BOUNDS.pad(-0.15).getCenter();
+function clearRouteLayer() {
+  if (!routeLayer || !map) return;
+  map.removeLayer(routeLayer);
+  routeLayer = null;
+}
+
+async function loadRoute() {
+  if (!map || !L || !props.showRoute || !hasCoords()) return;
+
+  const apiKey = neshanKey.value;
+  if (!apiKey) {
+    mapError.value = 'کلید API نشان تنظیم نشده است.';
+    return;
+  }
+
+  clearRouteLayer();
+
+  try {
+    const direction = await fetchNeshanDirection(
+      routeOrigin(),
+      { lat: props.latitude!, lng: props.longitude! },
+      apiKey
+    );
+    routeLayer = drawNeshanRouteOnMap(map, direction, L);
+    fitMapToRoute(map, routeLayer);
+  } catch {
+    mapError.value = 'نمایش مسیر روی نقشه ممکن نشد.';
+  }
 }
 
 function setLocation(lat: number, lng: number, moveMap = true) {
-  if (!map) return;
-  const target = props.readonly ? L.latLng(lat, lng) : clampToDeliveryArea(lat, lng);
-  if (!props.readonly && !KIASHAHR_BOUNDS.contains(L.latLng(lat, lng))) {
-    mapError.value = 'موقعیت خارج از محدوده کیاشهر است. نقشه روی کیاشهر تنظیم شد.';
+  if (!map || !L) return;
+  const target = props.readonly ? { lat, lng } : clampToDeliveryArea(lat, lng);
+
+  if (!props.readonly && L) {
+    const bounds = L.latLngBounds([37.32, 49.82], [37.53, 50.1]);
+    if (!bounds.contains(L.latLng(lat, lng))) {
+      mapError.value = 'موقعیت خارج از محدوده کیاشهر است. نقشه روی کیاشهر تنظیم شد.';
+    }
   }
 
   syncingFromProps = true;
   if (moveMap) {
-    map.setView(target, map.getZoom() || props.zoom, { animate: false });
+    map.setView([target.lat, target.lng], map.getZoom() || props.zoom, { animate: false });
   }
   if (props.readonly) {
-    marker?.setLatLng(target);
+    marker?.setLatLng([target.lat, target.lng]);
   }
   emitCoords(target.lat, target.lng);
   nextTick(() => {
@@ -215,59 +248,90 @@ function useCurrentLocation() {
   );
 }
 
-function initMap() {
-  if (!mapContainer.value || map) return;
+async function initMap() {
+  if (map || !mapContainer.value) return;
 
-  const start = hasCoords()
-    ? (props.readonly ? L.latLng(props.latitude!, props.longitude!) : clampToDeliveryArea(props.latitude!, props.longitude!))
-    : KIASHAHR_CENTER;
+  mapLoading.value = true;
+  mapError.value = '';
 
-  map = L.map(mapContainer.value, {
-    center: start,
-    zoom: props.zoom,
-    minZoom: 12,
-    maxZoom: 19,
-    scrollWheelZoom: !props.readonly,
-    dragging: !props.readonly,
-    zoomControl: !props.readonly,
-    attributionControl: true,
-    maxBounds: props.readonly ? undefined : KIASHAHR_BOUNDS.pad(0.15),
-    maxBoundsViscosity: props.readonly ? 0 : 0.7,
-  });
+  try {
+    L = await loadNeshanLeaflet();
+    if (!L) {
+      mapError.value = 'بارگذاری کتابخانه نقشه ممکن نشد.';
+      return;
+    }
 
-  addTiles(map);
+    setupMarkerIcon(L);
 
-  if (props.readonly && hasCoords()) {
-    marker = L.marker(start).addTo(map);
-  }
+    const apiKey = neshanKey.value;
+    if (!apiKey) {
+      mapError.value = 'کلید API نقشه نشان تنظیم نشده است.';
+    }
 
-  if (!props.readonly) {
-    map.on('moveend', updateFromCenter);
-    map.whenReady(() => {
-      updateFromCenter();
-      invalidateSize();
+    const start = getStartCoords();
+    const bounds = L.latLngBounds([37.32, 49.82], [37.53, 50.1]);
+
+    map = new L.Map(mapId, {
+      key: apiKey || ' ',
+      maptype: 'dreamy',
+      center: [start.lat, start.lng],
+      zoom: props.zoom,
+      minZoom: 12,
+      maxZoom: 19,
+      scrollWheelZoom: !props.readonly,
+      dragging: !props.readonly,
+      zoomControl: !props.readonly,
+      attributionControl: true,
+      maxBounds: props.readonly ? undefined : bounds.pad(0.15),
+      maxBoundsViscosity: props.readonly ? 0 : 0.7,
     });
-  }
 
-  if (mapContainer.value && typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => invalidateSize());
-    resizeObserver.observe(mapContainer.value);
+    if (props.readonly && hasCoords()) {
+      marker = L.marker([start.lat, start.lng]).addTo(map);
+    }
+
+    map.whenReady(() => {
+      invalidateSize();
+      ensureTilesVisible();
+
+      if (!props.readonly) {
+        updateFromCenter();
+      } else if (props.showRoute) {
+        loadRoute();
+      }
+    });
+
+    if (!props.readonly) {
+      map.on('moveend', updateFromCenter);
+    }
+
+    if (mapContainer.value && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => invalidateSize());
+      resizeObserver.observe(mapContainer.value);
+    }
+  } catch {
+    mapError.value = 'خطا در ایجاد نقشه.';
+  } finally {
+    mapLoading.value = false;
   }
 }
 
 function refreshFromProps() {
-  if (!map || !hasCoords() || syncingFromProps) return;
+  if (!map || !L || !hasCoords() || syncingFromProps) return;
 
-  const next = L.latLng(props.latitude!, props.longitude!);
+  const next = { lat: props.latitude!, lng: props.longitude! };
   const current = map.getCenter();
-  if (map.distance(current, next) < 12) return;
+  if (map.distance(current, L.latLng(next.lat, next.lng)) < 12) return;
 
   syncingFromProps = true;
-  map.panTo(next, { animate: false });
-  if (props.readonly) {
-    if (!marker) marker = L.marker(next).addTo(map);
-    else marker.setLatLng(next);
+  if (!props.showRoute) {
+    map.panTo([next.lat, next.lng], { animate: false });
   }
+  if (props.readonly) {
+    if (!marker) marker = L.marker([next.lat, next.lng]).addTo(map);
+    else marker.setLatLng([next.lat, next.lng]);
+  }
+  if (props.showRoute) loadRoute();
   nextTick(() => {
     syncingFromProps = false;
   });
@@ -275,23 +339,26 @@ function refreshFromProps() {
 
 function invalidateSize() {
   nextTick(() => {
-    if (!map) return;
-    map.invalidateSize({ animate: false });
+    map?.invalidateSize({ animate: false });
   });
 }
 
 defineExpose({ invalidateSize });
 
+watch(() => [props.latitude, props.longitude], () => refreshFromProps());
 watch(
-  () => [props.latitude, props.longitude],
-  () => refreshFromProps()
+  () => props.showRoute,
+  () => {
+    if (props.showRoute) loadRoute();
+    else clearRouteLayer();
+  }
 );
 
 onMounted(() => {
   nextTick(() => {
     initMap();
-    setTimeout(invalidateSize, 200);
-    setTimeout(invalidateSize, 700);
+    setTimeout(invalidateSize, 250);
+    setTimeout(invalidateSize, 800);
   });
 });
 
@@ -299,31 +366,41 @@ onUnmounted(() => {
   if (geocodeTimer) clearTimeout(geocodeTimer);
   resizeObserver?.disconnect();
   resizeObserver = null;
+  clearRouteLayer();
   map?.remove();
   map = null;
   marker = null;
+  L = null;
 });
 </script>
 
 <template>
   <div class="space-y-2">
-    <div class="relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100" dir="ltr">
-      <div ref="mapContainer" :style="{ height }" class="w-full z-0" />
+    <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-gray-100 shadow-sm" dir="ltr">
+      <div :id="mapId" ref="mapContainer" :style="{ height }" class="relative z-0 w-full min-h-[180px]" />
 
       <div
-        v-if="!readonly"
-        class="pointer-events-none absolute inset-0 flex items-center justify-center z-[401]"
+        v-if="mapLoading"
+        class="absolute inset-0 z-[400] flex items-center justify-center bg-gray-100/90 text-xs text-gray-500"
+      >
+        <AppIcon name="lucide:loader-2" size="sm" class="animate-spin text-primary-600" />
+        <span class="ms-2">در حال بارگذاری نقشه...</span>
+      </div>
+
+      <div
+        v-if="!readonly && !mapLoading"
+        class="pointer-events-none absolute inset-0 z-[401] flex items-center justify-center"
       >
         <div class="relative -mt-8">
           <AppIcon name="lucide:map-pin" size="lg" class="text-primary-600 drop-shadow-md" />
-          <span class="absolute left-1/2 top-full mt-1 -translate-x-1/2 w-2 h-2 rounded-full bg-primary-600/30" />
+          <span class="absolute left-1/2 top-full mt-1 h-2 w-2 -translate-x-1/2 rounded-full bg-primary-600/30" />
         </div>
       </div>
 
-      <div v-if="!readonly" class="absolute top-3 end-3 z-[402]">
+      <div v-if="!readonly && !mapLoading" class="absolute top-3 end-3 z-[402]">
         <button
           type="button"
-          class="w-10 h-10 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center"
+          class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-100 bg-white shadow-md"
           :disabled="locating"
           @click="useCurrentLocation"
         >
@@ -337,7 +414,7 @@ onUnmounted(() => {
 
       <div
         v-if="resolving"
-        class="absolute bottom-3 start-3 end-3 z-[402] bg-white/95 text-xs text-gray-600 px-3 py-2 rounded-lg shadow flex items-center gap-1.5"
+        class="absolute bottom-3 start-3 end-3 z-[402] flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-2 text-xs text-gray-600 shadow"
       >
         <AppIcon name="lucide:loader-2" size="sm" class="animate-spin text-primary-600" />
         در حال دریافت آدرس دقیق...
@@ -345,7 +422,7 @@ onUnmounted(() => {
     </div>
 
     <div v-if="!readonly" class="space-y-1">
-      <p class="text-xs text-gray-500 leading-relaxed">
+      <p class="text-xs leading-relaxed text-gray-500">
         {{ geocode ? 'نقشه را جابه‌جا کنید تا پین دقیقاً روی محل تحویل قرار بگیرد.' : 'نقشه را روی محل تحویل در کیاشهر بگذارید؛ آدرس را در فرم وارد کنید.' }}
       </p>
       <p v-if="hasCoords()" class="text-[11px] text-gray-400" dir="ltr">
@@ -356,7 +433,7 @@ onUnmounted(() => {
         :href="neshanRoutingLink(latitude!, longitude!)"
         target="_blank"
         rel="noopener"
-        class="inline-flex items-center gap-1 text-xs text-primary-600 font-medium"
+        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600"
       >
         <AppIcon name="lucide:navigation" size="sm" />
         مسیریابی با نشان
@@ -372,13 +449,11 @@ onUnmounted(() => {
   font-family: inherit;
   direction: ltr;
   background: #e8eef3;
+  height: 100%;
+  width: 100%;
 }
 :deep(.leaflet-control-zoom) {
   border: 0 !important;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
-}
-:deep(.leaflet-touch .leaflet-control-zoom) {
-  margin-top: 12px;
-  margin-left: 12px;
 }
 </style>

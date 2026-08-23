@@ -9,74 +9,58 @@ const { data: categories } = await useAsyncData('all-categories', async () => {
   return data;
 });
 
-const selectedCategory = ref<string | null>(null);
 const products = ref<Product[]>([]);
-const pagination = ref<Pagination | null>(null);
 const loading = ref(false);
 
-async function loadProducts(categorySlug?: string | null) {
+async function loadProducts() {
   loading.value = true;
   try {
-    const params = new URLSearchParams();
-    if (categorySlug) params.set('category', categorySlug);
-    params.set('limit', '20');
-
     const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-      `/products?${params.toString()}`
+      '/products?limit=20'
     );
     products.value = data.products;
-    pagination.value = data.pagination;
   } finally {
     loading.value = false;
   }
 }
 
-function selectCategory(slug: string | null) {
-  selectedCategory.value = slug;
-  loadProducts(slug);
-}
-
 onMounted(() => {
+  const categorySlug = route.query.category as string | undefined;
+  if (categorySlug) {
+    navigateTo(`/categories/${categorySlug}`, { replace: true });
+    return;
+  }
   loadProducts();
 });
 
-useHead({ title: 'دسته‌بندی‌ها - هایپرمارکت' });
+useHead({ title: 'دسته‌بندی‌ها - KIAA KALA' });
 </script>
 
 <template>
   <div class="px-4 py-4">
     <h1 class="section-title">دسته‌بندی‌ها</h1>
 
-    <!-- Category filter -->
     <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-4 mb-4">
-      <button
-        :class="[
-          'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-          !selectedCategory ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600',
-        ]"
-        @click="selectCategory(null)"
+      <NuxtLink
+        to="/categories"
+        class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-primary-600 text-white"
       >
         همه
-      </button>
-      <button
+      </NuxtLink>
+      <NuxtLink
         v-for="category in categories"
         :key="category.id"
-        :class="[
-          'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-          selectedCategory === category.slug ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600',
-        ]"
-        @click="selectCategory(category.slug)"
+        :to="`/categories/${category.slug}`"
+        class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
       >
         {{ category.name }}
-      </button>
+      </NuxtLink>
     </div>
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading && products.length" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
-      <ProductCard v-for="product in products" :key="product.id" :product="product" />
-    </div>
+    <ProductCardList v-if="!loading && products.length" :products="products" />
 
-    <EmptyState v-if="!loading && !products.length" message="محصولی در این دسته‌بندی یافت نشد" />
+    <EmptyState v-if="!loading && !products.length" message="محصولی یافت نشد" />
   </div>
 </template>

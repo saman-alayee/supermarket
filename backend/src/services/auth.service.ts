@@ -130,6 +130,13 @@ export class AuthService {
     return { verified: true, phone: normalizedPhone };
   }
 
+  /** Validates and consumes OTP for checkout (e.g. Social Security payment). */
+  async verifyCheckoutOtp(phone: string, code: string) {
+    const normalizedPhone = this.normalizePhone(phone);
+    await this.consumeValidOtp(normalizedPhone, code);
+    return { verified: true, phone: normalizedPhone };
+  }
+
   private async consumeValidOtp(phone: string, code: string): Promise<boolean> {
     const normalizedCode = normalizeDigits(code).trim();
     const otpRecord = await prisma.otpCode.findFirst({

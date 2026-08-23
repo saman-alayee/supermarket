@@ -248,7 +248,7 @@ export class ProductService {
         const products = await prisma.product.findMany({
           where: { categoryId: category.id, isActive: true },
           include: productInclude,
-          take: 8,
+          take: 10,
           orderBy: { createdAt: 'desc' },
         });
 

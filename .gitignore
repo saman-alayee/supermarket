@@ -37,3 +37,6 @@ Thumbs.db
 # Deploy temp artifacts
 deploy/api-temp/dist/
 deploy/api-temp/node_modules/
+
+# SSL private keys (never commit)
+deploy/ssl/

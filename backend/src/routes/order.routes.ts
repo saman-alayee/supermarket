@@ -20,6 +20,7 @@ const createOrderSchema = z
     customerName: z.string().min(3, 'نام و نام خانوادگی الزامی است'),
     customerPhone: z.string().min(10, 'شماره موبایل الزامی است'),
     deliveryAddress: z.string().min(5).optional(),
+    address: z.string().min(5).optional(),
     street: z.string().min(3).optional(),
     plaque: z.string().optional(),
     unit: z.string().optional(),
@@ -37,6 +38,7 @@ const createOrderSchema = z
     (data) =>
       Boolean(data.addressId) ||
       Boolean(data.deliveryAddress?.trim()) ||
+      Boolean(data.address?.trim()) ||
       Boolean(data.street?.trim()),
     { message: 'آدرس ارسال الزامی است (addressId، deliveryAddress یا street)' }
   );

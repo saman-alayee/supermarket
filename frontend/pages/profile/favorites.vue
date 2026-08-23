@@ -22,9 +22,7 @@ useHead({ title: 'علاقه‌مندی‌ها - KIAA KALA' });
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading && products.length" class="grid grid-cols-2 gap-3">
-      <ProductCard v-for="product in products" :key="product.id" :product="product" />
-    </div>
+    <ProductCardList v-if="!loading && products.length" :products="products" />
 
     <EmptyState v-if="!loading && !products.length" message="محصولی به علاقه‌مندی‌ها اضافه نشده" icon="lucide:heart">
       <NuxtLink to="/" class="btn-primary mt-4 text-sm inline-flex min-h-[44px] items-center px-6">رفتن به فروشگاه</NuxtLink>

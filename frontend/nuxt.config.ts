@@ -19,7 +19,8 @@ export default defineNuxtConfig({
 
   nitro: {
     prerender: {
-      routes: ['/pages/terms', '/pages/about', '/pages/privacy', '/pages/shipping', '/pages/faq'],
+      crawlLinks: false,
+      routes: ['/'],
     },
   },
 
@@ -43,7 +44,17 @@ export default defineNuxtConfig({
       ],
       link: [
         { rel: 'icon', type: 'image/png', href: '/logo.png' },
-        { rel: 'apple-touch-icon', href: '/logo.png' },
+        { rel: 'apple-touch-icon', href: '/pwa-192.png' },
+        {
+          rel: 'stylesheet',
+          href: 'https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.css',
+        },
+      ],
+      script: [
+        {
+          src: 'https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.js',
+          defer: true,
+        },
       ],
     },
   },
@@ -64,6 +75,7 @@ export default defineNuxtConfig({
       // Local: set NUXT_PUBLIC_API_BASE in .env (http://localhost:3001/api)
       // Production: usually /api behind nginx
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3001/api',
+      neshanApiKey: process.env.NUXT_PUBLIC_NESHAN_API_KEY || '',
     },
   },
 
@@ -81,6 +93,7 @@ export default defineNuxtConfig({
   pwa: {
     registerType: 'autoUpdate',
     manifest: {
+      id: '/',
       name: 'KIAA KALA',
       short_name: 'KIAA KALA',
       description: 'فروشگاه اینترنتی KIAA KALA',
@@ -90,10 +103,12 @@ export default defineNuxtConfig({
       orientation: 'portrait',
       lang: 'fa',
       dir: 'rtl',
+      scope: '/',
       start_url: '/',
       icons: [
-        { src: '/logo.png', sizes: 'any', type: 'image/png', purpose: 'any' },
-        { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     },
     workbox: {

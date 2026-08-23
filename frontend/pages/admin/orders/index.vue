@@ -192,6 +192,7 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
             :latitude="selectedOrder.deliveryLatitude"
             :longitude="selectedOrder.deliveryLongitude"
             readonly
+            show-route
             height="180px"
             :zoom="17"
             class="mt-2"

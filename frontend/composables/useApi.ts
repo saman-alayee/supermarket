@@ -23,13 +23,25 @@ export function useApi() {
       headers['X-Session-Id'] = sessionId.value;
     }
 
-    const response = await fetch(`${apiBase}${endpoint}`, {
-      cache: 'no-store',
-      ...options,
-      headers,
-    });
+    const url = `${apiBase}${endpoint}`;
 
-    const data = await response.json();
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        cache: 'no-store',
+        ...options,
+        headers,
+      });
+    } catch {
+      throw new Error('اتصال به سرور برقرار نشد. بک‌اند را روی پورت ۳۰۰۱ اجرا کنید.');
+    }
+
+    let data: ApiResponse<T> & { message?: string; errors?: { message?: string }[] };
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`پاسخ نامعتبر از سرور (${response.status})`);
+    }
 
     if (!response.ok) {
       const fieldError = Array.isArray(data.errors) ? data.errors[0]?.message : undefined;

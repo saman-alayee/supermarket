@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'profile' });
+definePageMeta({ layout: 'profile', middleware: 'auth' });
 
 const authStore = useAuthStore();
 const api = useApi();

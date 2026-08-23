@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Order } from '~/types';
 
-definePageMeta({ layout: 'profile' });
+definePageMeta({ layout: 'profile', middleware: 'auth' });
 
 const api = useApi();
 const route = useRoute();

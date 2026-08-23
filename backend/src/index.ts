@@ -100,7 +100,7 @@ async function start() {
     return;
   }
 
-  app.listen(config.port, () => {
+  app.listen(config.port, '0.0.0.0', () => {
     console.log(`🚀 Hyper Market API running on port ${config.port}`);
     console.log(`📦 Environment: ${config.nodeEnv}`);
   });

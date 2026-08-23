@@ -30,9 +30,9 @@ useHead({ title: 'سفارش ثبت شد - KIAA KALA' });
       مبلغ سفارش هنگام تحویل یا از طریق روش انتخاب‌شده در فروشگاه ثبت می‌شود. پرداخت آنلاین در سایت انجام نشده است.
     </div>
 
-    <div class="space-y-3">
-      <NuxtLink to="/" class="btn-primary w-full block min-h-[48px] leading-[3rem]">بازگشت به فروشگاه</NuxtLink>
-      <NuxtLink to="/profile/orders" class="btn-secondary w-full block min-h-[48px] leading-[3rem]">مشاهده سفارش‌ها</NuxtLink>
+    <div class="mx-auto max-w-lg space-y-3 md:max-w-md">
+      <NuxtLink to="/" class="btn-primary btn-action w-full">بازگشت به فروشگاه</NuxtLink>
+      <NuxtLink to="/profile/orders" class="btn-secondary btn-action w-full">مشاهده سفارش‌ها</NuxtLink>
     </div>
   </div>
 </template>

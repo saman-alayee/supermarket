@@ -6,6 +6,7 @@ import { cartService } from './cart.service';
 import { couponService } from './coupon.service';
 import { notificationService } from './notification.service';
 import { smsService } from './sms.service';
+import { authService } from './auth.service';
 import { normalizePhone } from '../utils/normalize';
 
 export type OrderStatus =
@@ -61,9 +62,13 @@ interface CreateOrderInput {
 const FREE_SHIPPING_MIN = 200_000;
 const JET_DELIVERY_FEE = 50_000;
 
-function buildDeliveryAddress(input: CreateOrderInput): string {
+function buildDeliveryAddress(input: CreateOrderInput & { address?: string }): string {
   if (input.deliveryAddress?.trim()) {
     return input.deliveryAddress.trim();
+  }
+
+  if (input.address?.trim()) {
+    return input.address.trim();
   }
 
   const parts = [input.street?.trim(), input.plaque ? `پلاک ${input.plaque}` : '', input.unit ? `واحد ${input.unit}` : '']
@@ -139,11 +144,21 @@ export class OrderService {
     }
     totalPrice += deliveryFee;
 
-    const paymentDetailsToStore = {
+    const paymentDetailsToStore: Record<string, unknown> = {
       ...(input.paymentDetails ?? {}),
       deliveryMethod,
       deliveryFee,
     };
+
+    if (input.paymentMethod === 'SOCIAL_SECURITY') {
+      const otpCode = paymentDetailsToStore.otpCode;
+      if (!otpCode || typeof otpCode !== 'string') {
+        throw new AppError(400, 'کد تأیید پیامکی برای پرداخت تامین اجتماعی الزامی است');
+      }
+      await authService.verifyCheckoutOtp(input.customerPhone, otpCode);
+      delete paymentDetailsToStore.otpCode;
+      paymentDetailsToStore.otpVerified = true;
+    }
     const cleanedPaymentDetails = Object.fromEntries(
       Object.entries(paymentDetailsToStore).filter(
         ([, value]) => value != null && (typeof value === 'number' || String(value).trim() !== '')

@@ -91,9 +91,7 @@ useHead(() => ({
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-      <ProductCard v-for="product in products" :key="product.id" :product="product" />
-    </div>
+    <ProductCardList v-if="!loading" :products="products" />
 
     <EmptyState v-if="!loading && !products.length" message="محصولی یافت نشد" />
   </div>

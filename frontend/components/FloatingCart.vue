@@ -4,9 +4,9 @@ const cartStore = useCartStore();
 const { formatPrice, toPersianDigits } = useFormat();
 
 const show = computed(() => {
-  if (route.path === '/checkout' || route.path.startsWith('/checkout/')) {
-    return false;
-  }
+  const path = route.path;
+  if (path === '/cart' || path.startsWith('/cart/')) return false;
+  if (path === '/checkout' || path.startsWith('/checkout/')) return false;
   return cartStore.totalItems > 0;
 });
 </script>
@@ -22,26 +22,25 @@ const show = computed(() => {
   >
     <div
       v-if="show"
-      class="fixed bottom-16 md:bottom-4 start-4 end-4 z-40 max-w-lg mx-auto"
+      class="fixed bottom-16 start-3 end-3 z-40 mx-auto max-w-md md:bottom-4 md:max-w-lg"
     >
       <NuxtLink
         to="/cart"
-        class="flex items-center gap-3 bg-gray-900 text-white rounded-2xl px-4 py-3 shadow-float"
+        class="flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-white shadow-float md:gap-2.5 md:px-3.5 md:py-2.5"
       >
-        <!-- Cart icon -->
-        <div class="relative">
-          <AppIcon name="lucide:shopping-cart" size="lg" />
-          <span class="absolute -top-2 -start-2 badge">{{ toPersianDigits(cartStore.totalItems) }}</span>
+        <div class="relative shrink-0">
+          <AppIcon name="lucide:shopping-cart" size="md" />
+          <span class="absolute -top-1.5 -start-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary-600 px-0.5 text-[9px] font-bold text-white">
+            {{ toPersianDigits(cartStore.totalItems) }}
+          </span>
         </div>
 
-        <!-- Total -->
-        <div class="flex-1">
-          <p class="text-sm font-bold">{{ formatPrice(cartStore.totalPrice) }}</p>
-          <p class="text-xs text-gray-400">{{ toPersianDigits(cartStore.totalItems) }} کالا در سبد خرید</p>
+        <div class="min-w-0 flex-1 leading-tight">
+          <p class="text-sm font-bold md:text-[15px]">{{ formatPrice(cartStore.totalPrice) }}</p>
+          <p class="text-[10px] text-gray-400 md:text-[11px]">{{ toPersianDigits(cartStore.totalItems) }} کالا</p>
         </div>
 
-        <!-- Checkout button -->
-        <span class="btn-primary text-sm py-2 px-4 whitespace-nowrap">
+        <span class="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-bold text-white md:px-3.5 md:py-2 md:text-sm">
           تسویه حساب
         </span>
       </NuxtLink>
