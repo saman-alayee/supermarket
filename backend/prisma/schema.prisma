@@ -11,6 +11,8 @@ datasource db {
 enum UserRole {
   CUSTOMER
   ADMIN
+  SUPERVISOR
+  STAFF
 }
 
 enum OrderStatus {
@@ -52,12 +54,14 @@ model User {
   lastName        String?
   passwordHash    String?
   role            UserRole @default(CUSTOMER)
+  accessRoleId    String?
   isActive        Boolean  @default(true)
   customerGroupId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   customerGroup CustomerGroup? @relation(fields: [customerGroupId], references: [id], onDelete: SetNull)
+  accessRole    AccessRole?    @relation(fields: [accessRoleId], references: [id], onDelete: SetNull)
   addresses     Address[]
   cart          Cart?
   orders        Order[]
@@ -66,7 +70,23 @@ model User {
   favorites     Favorite[]
 
   @@index([customerGroupId])
+  @@index([accessRoleId])
   @@map("users")
+}
+
+/** Custom panel roles created by the main admin */
+model AccessRole {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.VarChar(500)
+  /** JSON array of permission keys, e.g. ["orders","products"] */
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("access_roles")
 }
 
 model CustomerGroup {
@@ -131,22 +151,25 @@ model Tag {
 }
 
 model Product {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  description   String?
-  price         Int
-  discountPrice Int?
-  stock         Int      @default(0)
-  image         String?
-  unit          String?
-  isActive      Boolean  @default(true)
-  isFeatured    Boolean  @default(false)
-  isNew         Boolean  @default(false)
-  categoryId    String
-  tagId         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  description    String?
+  barcode        String?
+  productionDate DateTime?
+  expiryDate     DateTime?
+  price          Int
+  discountPrice  Int?
+  stock          Int       @default(0)
+  image          String?
+  unit           String?
+  isActive       Boolean   @default(true)
+  isFeatured     Boolean   @default(false)
+  isNew          Boolean   @default(false)
+  categoryId     String
+  tagId          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   category   Category       @relation(fields: [categoryId], references: [id])
   tag        Tag?           @relation(fields: [tagId], references: [id], onDelete: SetNull)
@@ -158,6 +181,8 @@ model Product {
 
   @@index([categoryId])
   @@index([tagId])
+  @@index([barcode])
+  @@index([expiryDate])
   @@index([isActive, isFeatured])
   @@index([isActive, isNew])
   @@map("products")
@@ -378,4 +403,13 @@ model Address {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
+}
+
+/** Key-value app settings (JSON). e.g. new_order_sms */
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
 }

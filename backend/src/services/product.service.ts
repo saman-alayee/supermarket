@@ -9,6 +9,9 @@ interface ProductFilters {
   tagId?: string;
   ids?: string[];
   search?: string;
+  barcode?: string;
+  expiringBefore?: string;
+  expiringAfter?: string;
   featured?: boolean;
   discounted?: boolean;
   isNew?: boolean;
@@ -42,6 +45,9 @@ export class ProductService {
       tagId,
       ids,
       search,
+      barcode,
+      expiringBefore,
+      expiringAfter,
       featured,
       discounted,
       isNew,
@@ -62,6 +68,15 @@ export class ProductService {
     if (featured) where.isFeatured = true;
     if (isNew) where.isNew = true;
     if (discounted) where.discountPrice = { not: null };
+    if (barcode?.trim()) {
+      where.barcode = textContains(barcode.trim());
+    }
+    if (expiringBefore || expiringAfter) {
+      where.expiryDate = {
+        ...(expiringAfter ? { gte: new Date(expiringAfter) } : {}),
+        ...(expiringBefore ? { lte: new Date(`${expiringBefore}T23:59:59.999Z`) } : {}),
+      };
+    }
     if (search) {
       const terms = search
         .trim()
@@ -73,6 +88,7 @@ export class ProductService {
           { name: textContains(term) },
           { description: textContains(term) },
           { slug: textContains(term) },
+          { barcode: textContains(term) },
           { category: { name: textContains(term) } },
           { tag: { name: textContains(term) } },
         ]);
@@ -128,6 +144,9 @@ export class ProductService {
   async create(data: {
     name: string;
     description?: string;
+    barcode?: string | null;
+    productionDate?: string | Date | null;
+    expiryDate?: string | Date | null;
     price: number;
     discountPrice?: number;
     stock: number;
@@ -139,13 +158,16 @@ export class ProductService {
     isFeatured?: boolean;
     isNew?: boolean;
   }) {
-    const { images, image, ...rest } = data;
+    const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
     const imageList = normalizeImages(images, image);
     const slug = slugify(data.name) + '-' + Date.now().toString(36);
 
     const product = await prisma.product.create({
       data: {
         ...rest,
+        barcode: barcode?.trim() || null,
+        productionDate: productionDate ? new Date(productionDate) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
         slug,
         image: imageList[0] ?? null,
         images: {
@@ -161,8 +183,18 @@ export class ProductService {
   }
 
   async update(id: string, data: Record<string, unknown>) {
-    const { images, image, ...rest } = data;
+    const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
     const updateData: Record<string, unknown> = { ...rest };
+
+    if (barcode !== undefined) {
+      updateData.barcode = typeof barcode === 'string' && barcode.trim() ? barcode.trim() : null;
+    }
+    if (productionDate !== undefined) {
+      updateData.productionDate = productionDate ? new Date(String(productionDate)) : null;
+    }
+    if (expiryDate !== undefined) {
+      updateData.expiryDate = expiryDate ? new Date(String(expiryDate)) : null;
+    }
 
     if (images !== undefined || image !== undefined) {
       const imageList = normalizeImages(
@@ -378,6 +410,9 @@ export class ProductService {
     name: string;
     slug: string;
     description: string | null;
+    barcode?: string | null;
+    productionDate?: Date | null;
+    expiryDate?: Date | null;
     price: unknown;
     discountPrice: unknown | null;
     stock: number;

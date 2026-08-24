@@ -184,6 +184,26 @@ export class SmsService {
     );
   }
 
+  /** Notify store operators about a brand-new order (uses admin settings). */
+  async notifyOperatorsNewOrder(orderNumber: string, customerName: string): Promise<void> {
+    try {
+      const { settingsService } = await import('./settings.service');
+      const { enabled, phones, messageTemplate } =
+        await settingsService.resolveNewOrderSmsRecipients();
+      if (!enabled || !phones.length) return;
+
+      const text = messageTemplate
+        .split('{orderNumber}')
+        .join(orderNumber)
+        .split('{customerName}')
+        .join(customerName);
+
+      await this.broadcast(phones, text);
+    } catch (error) {
+      console.error('Failed to notify operators of new order:', error);
+    }
+  }
+
   /** Broadcast message to multiple recipients. */
   async broadcast(recipients: string[], message: string): Promise<{ queued: number }> {
     const formatted = recipients.map((r) => this.formatRecipient(r));

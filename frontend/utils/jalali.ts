@@ -51,6 +51,12 @@ export function jalaliToGregorianIso(jYear: number, jMonth: number, jDay: number
   return dayjs(`${jYear}/${jMonth}/${jDay}`, { jalali: true }).calendar('gregory').format('YYYY-MM-DD');
 }
 
+export function formatJalaliMonthYear(date: string | Date | null | undefined): string {
+  if (!date) return '—';
+  const jalali = toJalali(date);
+  return `${JALALI_MONTHS[jalali.month()]} ${toPersianDigits(jalali.year())}`;
+}
+
 export function formatJalaliDate(
   date: string | Date | null | undefined,
   options: { short?: boolean; withTime?: boolean } = {}

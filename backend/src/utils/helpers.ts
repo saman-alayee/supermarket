@@ -1,12 +1,20 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
 
-export type UserRole = 'CUSTOMER' | 'ADMIN';
+export type UserRole = 'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF';
+
+export const PANEL_ROLES: UserRole[] = ['ADMIN', 'SUPERVISOR', 'STAFF'];
+
+export function isPanelRole(role: string | undefined | null): boolean {
+  return !!role && PANEL_ROLES.includes(role as UserRole);
+}
 
 export interface JwtPayload {
   userId: string;
   phone: string;
   role: UserRole;
+  permissions?: string[];
+  accessRoleId?: string | null;
 }
 
 export function generateToken(payload: JwtPayload): string {

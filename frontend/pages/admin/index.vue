@@ -21,13 +21,21 @@ onMounted(async () => {
   stats.value = data;
 });
 
+const { navVisible } = useAdminAccess();
+
 const quickLinks = [
   { to: '/admin/orders?status=NEW', label: 'سفارش‌های جدید', desc: 'بررسی و تأیید', icon: 'lucide:inbox' },
   { to: '/admin/orders?status=PREPARING', label: 'در حال آماده‌سازی', desc: 'آماده برای ارسال', icon: 'lucide:chef-hat' },
+  { to: '/admin/products', label: 'محصولات', desc: 'افزودن و ویرایش کالا', icon: 'lucide:shopping-basket' },
+  { to: '/admin/sales', label: 'گزارش فروش', desc: 'بازه تاریخ و کالا', icon: 'lucide:bar-chart-3' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', desc: 'مدیریت پرومو', icon: 'lucide:ticket-percent' },
-  { to: '/admin/users', label: 'کاربران و ادمین', desc: 'نقش‌ها و دسترسی', icon: 'lucide:users' },
+  { to: '/admin/users', label: 'کاربران و دسترسی', desc: 'مدیر، مسئول، پرسنل', icon: 'lucide:users' },
   { to: '/admin/content', label: 'قوانین و مقررات', desc: 'ویرایش متن قوانین سایت', icon: 'lucide:file-text' },
 ];
+
+const visibleLinks = computed(() =>
+  quickLinks.filter((link) => navVisible(link.to.split('?')[0]))
+);
 
 useHead({ title: 'داشبورد - پنل مدیریت' });
 </script>
@@ -73,7 +81,7 @@ useHead({ title: 'داشبورد - پنل مدیریت' });
     <h2 class="text-sm font-bold text-gray-700 mb-3">دسترسی سریع</h2>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <NuxtLink
-        v-for="link in quickLinks"
+        v-for="link in visibleLinks"
         :key="link.to"
         :to="link.to"
         class="card p-4 hover:shadow-md transition-shadow flex items-start gap-3"

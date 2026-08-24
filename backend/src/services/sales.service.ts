@@ -1,4 +1,4 @@
-import type { PaymentMethod } from '@prisma/client';
+import type { PaymentMethod, Prisma } from '@prisma/client';
 import prisma from '../config/database';
 
 function startOfDay(date: Date) {
@@ -11,6 +11,41 @@ function endOfDay(date: Date) {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
   return d;
+}
+
+export interface SalesFilters {
+  days?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  productSearch?: string;
+}
+
+function resolveRange(filters: SalesFilters = {}) {
+  const { days = 30, dateFrom, dateTo } = filters;
+  let since: Date;
+  let until: Date | undefined;
+
+  if (dateFrom || dateTo) {
+    since = dateFrom ? startOfDay(new Date(dateFrom)) : startOfDay(new Date(0));
+    until = dateTo ? endOfDay(new Date(dateTo)) : endOfDay(new Date());
+  } else {
+    since = new Date();
+    since.setDate(since.getDate() - days);
+    since.setHours(0, 0, 0, 0);
+  }
+
+  return { since, until };
+}
+
+function orderDateWhere(filters: SalesFilters = {}): Prisma.OrderWhereInput {
+  const { since, until } = resolveRange(filters);
+  return {
+    createdAt: {
+      gte: since,
+      ...(until ? { lte: until } : {}),
+    },
+    status: { notIn: ['CANCELLED'] },
+  };
 }
 
 export class SalesService {
@@ -43,17 +78,21 @@ export class SalesService {
     };
   }
 
-  async getTopProducts(limit = 10, days = 30) {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-
+  async getTopProducts(limit = 10, filters: SalesFilters = {}) {
+    const productSearch = filters.productSearch?.trim();
     const items = await prisma.orderItem.groupBy({
       by: ['productId', 'name'],
       where: {
-        order: {
-          createdAt: { gte: since },
-          status: { notIn: ['CANCELLED'] },
-        },
+        order: orderDateWhere(filters),
+        ...(productSearch
+          ? {
+              OR: [
+                { name: { contains: productSearch } },
+                { product: { barcode: { contains: productSearch } } },
+                { product: { name: { contains: productSearch } } },
+              ],
+            }
+          : {}),
       },
       _sum: { quantity: true },
       _count: { id: true },
@@ -64,7 +103,14 @@ export class SalesService {
     const productIds = items.map((i) => i.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, slug: true, image: true, price: true, discountPrice: true },
+      select: {
+        id: true,
+        slug: true,
+        image: true,
+        price: true,
+        discountPrice: true,
+        barcode: true,
+      },
     });
     const productMap = new Map(products.map((p) => [p.id, p]));
 
@@ -77,16 +123,10 @@ export class SalesService {
     }));
   }
 
-  async getByPaymentMethod(days = 30) {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-
+  async getByPaymentMethod(filters: SalesFilters = {}) {
     const groups = await prisma.order.groupBy({
       by: ['paymentMethod'],
-      where: {
-        createdAt: { gte: since },
-        status: { notIn: ['CANCELLED'] },
-      },
+      where: orderDateWhere(filters),
       _sum: { totalPrice: true },
       _count: { id: true },
     });
@@ -98,17 +138,44 @@ export class SalesService {
     }));
   }
 
-  async getChartData(days = 30) {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-    since.setHours(0, 0, 0, 0);
-
+  async getChartData(filters: SalesFilters = {}) {
+    const productSearch = filters.productSearch?.trim();
     const orders = await prisma.order.findMany({
       where: {
-        createdAt: { gte: since },
-        status: { notIn: ['CANCELLED'] },
+        ...orderDateWhere(filters),
+        ...(productSearch
+          ? {
+              items: {
+                some: {
+                  OR: [
+                    { name: { contains: productSearch } },
+                    { product: { barcode: { contains: productSearch } } },
+                    { product: { name: { contains: productSearch } } },
+                  ],
+                },
+              },
+            }
+          : {}),
       },
-      select: { createdAt: true, totalPrice: true, paymentMethod: true, userId: true, customerPhone: true },
+      select: {
+        createdAt: true,
+        totalPrice: true,
+        paymentMethod: true,
+        userId: true,
+        customerPhone: true,
+        items: productSearch
+          ? {
+              where: {
+                OR: [
+                  { name: { contains: productSearch } },
+                  { product: { barcode: { contains: productSearch } } },
+                  { product: { name: { contains: productSearch } } },
+                ],
+              },
+              select: { quantity: true, price: true, name: true },
+            }
+          : false,
+      },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -119,14 +186,17 @@ export class SalesService {
     for (const order of orders) {
       const dateKey = order.createdAt.toISOString().slice(0, 10);
       const entry = dailyMap.get(dateKey) ?? { date: dateKey, revenue: 0, orders: 0 };
-      entry.revenue += Number(order.totalPrice);
+
+      let revenue = Number(order.totalPrice);
+      if (productSearch && Array.isArray(order.items)) {
+        revenue = order.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+      }
+
+      entry.revenue += revenue;
       entry.orders += 1;
       dailyMap.set(dateKey, entry);
 
-      paymentMap.set(
-        order.paymentMethod,
-        (paymentMap.get(order.paymentMethod) ?? 0) + Number(order.totalPrice)
-      );
+      paymentMap.set(order.paymentMethod, (paymentMap.get(order.paymentMethod) ?? 0) + revenue);
       customerKeys.add(order.userId || order.customerPhone);
     }
 
@@ -144,12 +214,13 @@ export class SalesService {
     };
   }
 
-  async getOverview(days = 30) {
+  async getOverview(filters: SalesFilters = {}) {
+    const days = filters.days ?? 30;
     const [daily, topProducts, byPayment, chart, monthly] = await Promise.all([
       this.getDailySales(),
-      this.getTopProducts(10, days),
-      this.getByPaymentMethod(days),
-      this.getChartData(days),
+      this.getTopProducts(10, filters),
+      this.getByPaymentMethod(filters),
+      this.getChartData(filters),
       this.getMonthlyComparison(6),
     ]);
 
@@ -170,6 +241,12 @@ export class SalesService {
       monthly,
       chart,
       today: daily,
+      filters: {
+        days,
+        dateFrom: filters.dateFrom ?? null,
+        dateTo: filters.dateTo ?? null,
+        productSearch: filters.productSearch ?? null,
+      },
     };
   }
 

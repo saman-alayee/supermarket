@@ -186,7 +186,7 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
         <thead>
           <tr>
             <th>مشتری</th>
-            <th>موبایل</th>
+            <th class="text-start">شماره تلفن</th>
             <th>آدرس</th>
             <th>سفارش</th>
             <th>جمع خرید</th>
@@ -196,9 +196,11 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
         </thead>
         <tbody>
           <tr v-for="customer in customers" :key="customer.id">
-            <td class="font-medium">{{ customerName(customer) }}</td>
-            <td dir="ltr">{{ customer.phone }}</td>
-            <td class="text-gray-500 max-w-[180px] truncate">{{ customer.address || '—' }}</td>
+            <td class="font-medium text-gray-800">{{ customerName(customer) }}</td>
+            <td class="text-sm text-gray-600 text-start">
+              <span dir="ltr" class="inline-block">{{ customer.phone }}</span>
+            </td>
+            <td class="text-gray-500 max-w-[220px] truncate">{{ customer.address || '—' }}</td>
             <td>{{ formatNumber(customer._count.orders) }}</td>
             <td>{{ formatPrice(customer.totalSpend || 0) }}</td>
             <td class="text-gray-500">{{ customer.customerGroup?.name || '—' }}</td>
@@ -216,7 +218,7 @@ useHead({ title: 'مشتریان - پنل مدیریت' });
       <div class="bg-white rounded-t-3xl md:rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <div class="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h2 class="text-lg font-bold text-gray-800">جزئیات مشتری</h2>
+            <h2 class="text-lg font-bold text-gray-800">{{ customerName(selectedCustomer) }}</h2>
             <p class="text-sm text-gray-500 mt-1" dir="ltr">{{ selectedCustomer.phone }}</p>
           </div>
           <button class="p-2 rounded-lg hover:bg-gray-100" @click="closeDetail">

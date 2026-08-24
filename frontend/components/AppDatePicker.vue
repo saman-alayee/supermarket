@@ -35,15 +35,18 @@ const emit = defineEmits<{
 }>();
 
 const open = ref(false);
+const isMobile = ref(false);
 const triggerRef = ref<HTMLElement | null>(null);
-const menuStyle = ref({ top: '0px', left: '0px', width: '0px' });
+const menuStyle = ref<Record<string, string>>({ top: '0px', left: '0px', width: '320px' });
 
 const todayJalali = getTodayJalali();
 const viewYear = ref(todayJalali.year);
 const viewMonth = ref(todayJalali.month);
 
+const selectedIso = computed(() => props.modelValue?.slice(0, 10) || null);
+
 const displayValue = computed(() =>
-  props.modelValue ? formatJalaliInputValue(props.modelValue) : ''
+  selectedIso.value ? formatJalaliInputValue(selectedIso.value) : ''
 );
 
 const monthLabel = computed(
@@ -53,7 +56,13 @@ const monthLabel = computed(
 const calendarDays = computed(() => {
   const monthLength = getJalaliMonthLength(viewYear.value, viewMonth.value);
   const firstWeekday = getJalaliWeekdayIndex(viewYear.value, viewMonth.value, 1);
-  const cells: Array<{ day: number | null; iso: string | null; disabled: boolean; isToday: boolean; isSelected: boolean }> = [];
+  const cells: Array<{
+    day: number | null;
+    iso: string | null;
+    disabled: boolean;
+    isToday: boolean;
+    isSelected: boolean;
+  }> = [];
 
   for (let i = 0; i < firstWeekday; i += 1) {
     cells.push({ day: null, iso: null, disabled: true, isToday: false, isSelected: false });
@@ -66,7 +75,7 @@ const calendarDays = computed(() => {
       iso,
       disabled: isOutOfRange(iso),
       isToday: iso === getTodayGregorianIso(),
-      isSelected: props.modelValue?.slice(0, 10) === iso,
+      isSelected: selectedIso.value === iso,
     });
   }
 
@@ -85,25 +94,46 @@ function isOutOfRange(iso: string): boolean {
 }
 
 function syncViewWithValue() {
-  if (!props.modelValue) {
+  if (!selectedIso.value) {
     const today = getTodayJalali();
     viewYear.value = today.year;
     viewMonth.value = today.month;
     return;
   }
 
-  const jalali = gregorianIsoToJalali(props.modelValue.slice(0, 10));
+  const jalali = gregorianIsoToJalali(selectedIso.value);
   viewYear.value = jalali.year;
   viewMonth.value = jalali.month;
 }
 
+function syncViewport() {
+  isMobile.value = window.innerWidth < 768;
+}
+
 function updateMenuPosition() {
-  if (!triggerRef.value) return;
+  syncViewport();
+  if (!triggerRef.value || isMobile.value) return;
+
   const rect = triggerRef.value.getBoundingClientRect();
+  const width = Math.min(320, window.innerWidth - 16);
+  let left = rect.left;
+  if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
+  if (left < 8) left = 8;
+
+  const estimatedHeight = 380;
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const openUp = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+
+  let top = openUp ? rect.top - estimatedHeight - 6 : rect.bottom + 6;
+  if (top < 8) top = 8;
+  if (top + estimatedHeight > window.innerHeight - 8) {
+    top = Math.max(8, window.innerHeight - estimatedHeight - 8);
+  }
+
   menuStyle.value = {
-    top: `${rect.bottom + 6}px`,
-    left: `${rect.left}px`,
-    width: `${Math.max(rect.width, 300)}px`,
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${width}px`,
   };
 }
 
@@ -114,6 +144,10 @@ function toggle() {
     syncViewWithValue();
     nextTick(updateMenuPosition);
   }
+}
+
+function close() {
+  open.value = false;
 }
 
 function selectDate(iso: string | null) {
@@ -149,8 +183,16 @@ function nextMonth() {
   }
 }
 
+function prevYear() {
+  viewYear.value -= 1;
+}
+
+function nextYear() {
+  viewYear.value += 1;
+}
+
 function onDocumentClick(event: MouseEvent) {
-  if (!open.value) return;
+  if (!open.value || isMobile.value) return;
   const target = event.target as Node;
   if (triggerRef.value?.contains(target)) return;
   const menu = document.getElementById(menuId);
@@ -167,13 +209,21 @@ watch(
   }
 );
 
+watch(open, (isOpen) => {
+  if (!import.meta.client) return;
+  document.body.classList.toggle('overflow-hidden', isOpen && isMobile.value);
+  if (isOpen) nextTick(updateMenuPosition);
+});
+
 onMounted(() => {
+  syncViewport();
   document.addEventListener('click', onDocumentClick);
   window.addEventListener('resize', updateMenuPosition);
   window.addEventListener('scroll', updateMenuPosition, true);
 });
 
 onUnmounted(() => {
+  document.body.classList.remove('overflow-hidden');
   document.removeEventListener('click', onDocumentClick);
   window.removeEventListener('resize', updateMenuPosition);
   window.removeEventListener('scroll', updateMenuPosition, true);
@@ -181,7 +231,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div ref="triggerRef" class="relative w-full">
+  <div ref="triggerRef" class="relative w-full">
     <div
       :class="[
         'input-field flex items-center justify-between gap-2 text-start transition-all',
@@ -226,6 +276,97 @@ onUnmounted(() => {
     </div>
 
     <Teleport to="body">
+      <div v-if="open && isMobile" class="fixed inset-0 z-[10050] flex items-end justify-center sm:items-center">
+        <button
+          type="button"
+          class="absolute inset-0 bg-black/50"
+          aria-label="بستن تقویم"
+          @click="close"
+        />
+        <div
+          :id="menuId"
+          class="relative z-10 w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] max-h-[min(92vh,560px)] overflow-y-auto"
+          @click.stop
+        >
+          <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-200 sm:hidden" />
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gray-800">انتخاب تاریخ شمسی</p>
+            <button type="button" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500" @click="close">
+              <AppIcon name="lucide:x" size="sm" />
+            </button>
+          </div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-1">
+              <button type="button" class="p-2 rounded-lg hover:bg-gray-100 text-gray-600" @click="nextYear">
+                <AppIcon name="lucide:chevrons-right" size="sm" />
+              </button>
+              <button type="button" class="p-2 rounded-lg hover:bg-gray-100 text-gray-600" @click="nextMonth">
+                <AppIcon name="lucide:chevron-right" size="sm" />
+              </button>
+            </div>
+            <p class="text-base font-semibold text-gray-800">{{ monthLabel }}</p>
+            <div class="flex items-center gap-1">
+              <button type="button" class="p-2 rounded-lg hover:bg-gray-100 text-gray-600" @click="prevMonth">
+                <AppIcon name="lucide:chevron-left" size="sm" />
+              </button>
+              <button type="button" class="p-2 rounded-lg hover:bg-gray-100 text-gray-600" @click="prevYear">
+                <AppIcon name="lucide:chevrons-left" size="sm" />
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 mb-1">
+            <span
+              v-for="weekday in JALALI_WEEKDAYS"
+              :key="weekday"
+              class="text-center text-xs font-medium text-gray-400 py-1"
+            >
+              {{ weekday }}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1.5">
+            <span v-for="(cell, index) in calendarDays" :key="index" class="min-h-11">
+              <button
+                v-if="cell.day"
+                type="button"
+                :disabled="cell.disabled"
+                :class="[
+                  'w-full h-11 rounded-xl text-base transition-colors',
+                  cell.isSelected
+                    ? 'bg-primary-600 text-white font-semibold shadow-sm'
+                    : cell.isToday
+                      ? 'bg-primary-50 text-primary-700 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100',
+                  cell.disabled ? 'opacity-30 cursor-not-allowed hover:bg-transparent' : '',
+                ]"
+                @click="selectDate(cell.iso)"
+              >
+                {{ toPersianDigits(cell.day) }}
+              </button>
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-100">
+            <button
+              type="button"
+              class="text-sm font-medium text-primary-600 hover:text-primary-700 px-3 py-2 rounded-lg hover:bg-primary-50"
+              @click="selectToday"
+            >
+              امروز
+            </button>
+            <button
+              v-if="clearable"
+              type="button"
+              class="text-sm font-medium text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50"
+              @click="clearDate"
+            >
+              پاک کردن
+            </button>
+          </div>
+        </div>
+      </div>
+
       <Transition
         enter-active-class="transition duration-150 ease-out"
         enter-from-class="opacity-0 scale-95 -translate-y-1"
@@ -235,28 +376,30 @@ onUnmounted(() => {
         leave-to-class="opacity-0 scale-95"
       >
         <div
-          v-if="open"
+          v-if="open && !isMobile"
           :id="menuId"
-          class="fixed z-[9999] rounded-xl border border-gray-100 bg-white shadow-xl p-3"
+          class="fixed z-[10050] rounded-xl border border-gray-100 bg-white shadow-xl p-3"
           :style="menuStyle"
           @click.stop
         >
           <div class="flex items-center justify-between mb-3">
-            <button
-              type="button"
-              class="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-              @click="nextMonth"
-            >
-              <AppIcon name="lucide:chevron-right" size="sm" />
-            </button>
+            <div class="flex items-center">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600" @click="nextYear">
+                <AppIcon name="lucide:chevrons-right" size="sm" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600" @click="nextMonth">
+                <AppIcon name="lucide:chevron-right" size="sm" />
+              </button>
+            </div>
             <p class="text-sm font-semibold text-gray-800">{{ monthLabel }}</p>
-            <button
-              type="button"
-              class="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
-              @click="prevMonth"
-            >
-              <AppIcon name="lucide:chevron-left" size="sm" />
-            </button>
+            <div class="flex items-center">
+              <button type="button" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600" @click="prevMonth">
+                <AppIcon name="lucide:chevron-left" size="sm" />
+              </button>
+              <button type="button" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600" @click="prevYear">
+                <AppIcon name="lucide:chevrons-left" size="sm" />
+              </button>
+            </div>
           </div>
 
           <div class="grid grid-cols-7 gap-1 mb-1">

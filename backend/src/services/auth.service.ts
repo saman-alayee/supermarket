@@ -1,12 +1,13 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../config/database';
 import { config } from '../config';
-import { generateOtpCode, generateToken } from '../utils/helpers';
+import { generateOtpCode, generateToken, isPanelRole, type UserRole } from '../utils/helpers';
 import { AppError } from '../utils/errors';
 import { normalizeDigits, normalizePhone } from '../utils/normalize';
 import { smsService } from './sms.service';
+import { permissionsForRole } from '../utils/permissions';
 
-export type UserRole = 'CUSTOMER' | 'ADMIN';
+export type { UserRole };
 
 const PASSWORD_MIN_LENGTH = 6;
 
@@ -59,11 +60,11 @@ export class AuthService {
       throw new AppError(403, 'حساب کاربری غیرفعال است');
     }
 
-    if (options?.requireAdmin && user.role !== 'ADMIN') {
+    if (options?.requireAdmin && !isPanelRole(user.role)) {
       throw new AppError(403, 'این صفحه مخصوص ورود مدیران است');
     }
 
-    return this.buildAuthResponse(user);
+    return await this.buildAuthResponse(user);
   }
 
   /** Customer (or any user with personal password) login */
@@ -75,7 +76,7 @@ export class AuthService {
       throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
     }
 
-    if (options?.requireAdmin && user.role !== 'ADMIN') {
+    if (options?.requireAdmin && !isPanelRole(user.role)) {
       throw new AppError(403, 'این صفحه مخصوص ورود مدیران است');
     }
 
@@ -84,7 +85,7 @@ export class AuthService {
       throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');
     }
 
-    return this.buildAuthResponse(user);
+    return await this.buildAuthResponse(user);
   }
 
   async setPassword(
@@ -170,6 +171,8 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        accessRoleId: true,
+        accessRole: { select: { id: true, name: true, permissions: true } },
         passwordHash: true,
         createdAt: true,
         addresses: { orderBy: { isDefault: 'desc' } },
@@ -179,8 +182,24 @@ export class AuthService {
 
     if (!user) throw new AppError(404, 'کاربر یافت نشد');
 
-    const { passwordHash, ...rest } = user;
-    return { ...rest, hasPassword: Boolean(passwordHash) };
+    const { passwordHash, accessRole, ...rest } = user;
+    const permissions = permissionsForRole(
+      user.role,
+      user.accessRoleId ? accessRole?.permissions : undefined
+    );
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      role: user.role as UserRole,
+    });
+
+    return {
+      ...rest,
+      accessRole,
+      permissions,
+      hasPassword: Boolean(passwordHash),
+      token,
+    };
   }
 
   async updateProfile(userId: string, data: { firstName?: string; lastName?: string }) {
@@ -209,8 +228,8 @@ export class AuthService {
       return bcrypt.compare(password, user.passwordHash);
     }
 
-    // Legacy fallback: shared ADMIN_PASSWORD only for admins without personal hash
-    if (user.role === 'ADMIN' && password === config.adminPassword) {
+    // Legacy fallback: shared ADMIN_PASSWORD for any panel role without personal hash
+    if (isPanelRole(user.role) && password === config.adminPassword) {
       return true;
     }
 
@@ -233,7 +252,9 @@ export class AuthService {
       return user;
     }
 
-    if (isAdminPhone && user.role !== 'ADMIN') {
+    // Only bootstrap CUSTOMER → ADMIN for listed phones.
+    // Never overwrite SUPERVISOR / STAFF (manual role assignment must stick).
+    if (isAdminPhone && user.role === 'CUSTOMER') {
       user = await prisma.user.update({
         where: { id: user.id },
         data: { role: 'ADMIN' },
@@ -243,14 +264,29 @@ export class AuthService {
     return user;
   }
 
-  private buildAuthResponse(user: {
+  private async buildAuthResponse(user: {
     id: string;
     phone: string;
     firstName: string | null;
     lastName: string | null;
     role: UserRole;
     passwordHash?: string | null;
+    accessRoleId?: string | null;
   }) {
+    let customPermissions: unknown;
+    if (user.accessRoleId) {
+      const accessRole = await prisma.accessRole.findUnique({
+        where: { id: user.accessRoleId },
+        select: { id: true, name: true, permissions: true },
+      });
+      customPermissions = accessRole?.permissions;
+    }
+
+    const permissions = permissionsForRole(
+      user.role,
+      user.accessRoleId ? customPermissions : undefined
+    );
+
     const token = generateToken({
       userId: user.id,
       phone: user.phone,
@@ -265,6 +301,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        accessRoleId: user.accessRoleId ?? null,
+        permissions,
         hasPassword: Boolean(user.passwordHash),
       },
     };

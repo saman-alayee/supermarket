@@ -11,13 +11,26 @@ import { tagService } from '../services/tag.service';
 import { sliderService } from '../services/slider.service';
 import { salesService } from '../services/sales.service';
 import { asyncHandler, successResponse, validate } from '../utils/errors';
-import { authenticate, requireAdmin } from '../middleware/auth';
+import { authenticate, requireAdmin, requireRoles, requirePermission } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { paramId } from '../utils/params';
+import { accessRoleService } from '../services/access-role.service';
+import { settingsService } from '../services/settings.service';
+import { PANEL_PERMISSIONS } from '../utils/permissions';
 
 const router = Router();
 
 router.use(authenticate, requireAdmin);
+
+const adminOnly = requireRoles('ADMIN');
+const permCategories = requirePermission('categories');
+const permCustomers = requirePermission('customers');
+const permCoupons = requirePermission('coupons');
+const permContent = requirePermission('content');
+const permTags = requirePermission('tags');
+const permSliders = requirePermission('sliders');
+const permSales = requirePermission('sales');
+const permSettings = requirePermission('settings');
 
 // Dashboard stats
 router.get(
@@ -52,6 +65,7 @@ router.get(
 
 router.post(
   '/categories',
+  permCategories,
   validate(categorySchema),
   asyncHandler(async (req, res) => {
     const category = await categoryService.create(req.body);
@@ -61,6 +75,7 @@ router.post(
 
 router.put(
   '/categories/:id',
+  permCategories,
   validate(categorySchema.partial()),
   asyncHandler(async (req, res) => {
     const category = await categoryService.update(paramId(req.params.id), req.body);
@@ -70,6 +85,7 @@ router.put(
 
 router.delete(
   '/categories/:id',
+  permCategories,
   asyncHandler(async (req, res) => {
     await categoryService.delete(paramId(req.params.id));
     successResponse(res, null, 'دسته‌بندی حذف شد');
@@ -78,6 +94,7 @@ router.delete(
 
 router.put(
   '/categories/reorder',
+  permCategories,
   asyncHandler(async (req, res) => {
     await categoryService.reorder(req.body.items);
     successResponse(res, null, 'ترتیب به‌روزرسانی شد');
@@ -86,6 +103,7 @@ router.put(
 
 router.post(
   '/categories/upload',
+  permCategories,
   upload.single('image'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
@@ -101,6 +119,9 @@ router.post(
 const productSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
+  barcode: z.string().optional().nullable(),
+  productionDate: z.string().optional().nullable(),
+  expiryDate: z.string().optional().nullable(),
   price: z.number().positive(),
   discountPrice: z.number().positive().optional().nullable(),
   stock: z.number().int().min(0),
@@ -120,9 +141,13 @@ router.get(
     const result = await productService.getAll({
       includeInactive: true,
       search: req.query.search as string,
+      barcode: req.query.barcode as string,
+      tagId: req.query.tagId as string,
       categoryId: req.query.categoryId as string,
+      expiringBefore: req.query.expiringBefore as string,
+      expiringAfter: req.query.expiringAfter as string,
       page: req.query.page ? parseInt(req.query.page as string) : 1,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+      limit: Math.min(req.query.limit ? parseInt(req.query.limit as string) : 20, 50),
     });
     successResponse(res, result);
   })
@@ -211,6 +236,7 @@ router.post(
 // Customers & users
 router.get(
   '/customers',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const result = await customerService.getAll(
       req.query.page ? parseInt(req.query.page as string) : 1,
@@ -226,6 +252,7 @@ router.get(
 
 router.post(
   '/customers',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const customer = await customerService.create(req.body);
     successResponse(res, customer, 'مشتری ایجاد شد', 201);
@@ -234,6 +261,7 @@ router.post(
 
 router.get(
   '/customers/export-phones',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const csv = await customerService.exportPhonesCsv({
       customerGroupId: (req.query.customerGroupId as string) || (req.query.groupId as string),
@@ -247,6 +275,7 @@ router.get(
 
 router.post(
   '/customers/broadcast-sms',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const { message, customerGroupId, paymentMethod } = req.body;
     const result = await customerService.broadcastSms(message, { customerGroupId, paymentMethod });
@@ -256,6 +285,7 @@ router.post(
 
 router.put(
   '/customers/:id/group',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const customer = await customerService.assignGroup(
       paramId(req.params.id),
@@ -267,12 +297,13 @@ router.put(
 
 router.get(
   '/users',
+  adminOnly,
   asyncHandler(async (req, res) => {
     const result = await customerService.getAll(
       req.query.page ? parseInt(req.query.page as string) : 1,
       req.query.limit ? parseInt(req.query.limit as string) : 20,
       req.query.search as string,
-      req.query.role as 'CUSTOMER' | 'ADMIN' | undefined
+      req.query.role as 'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF' | undefined
     );
     successResponse(res, result);
   })
@@ -280,26 +311,30 @@ router.get(
 
 router.post(
   '/users/admin',
+  adminOnly,
   validate(
     z.object({
       phone: z.string().min(10),
       firstName: z.string().optional(),
       lastName: z.string().optional(),
       password: z.string().min(6).optional(),
+      role: z.enum(['ADMIN', 'SUPERVISOR', 'STAFF']).optional(),
+      accessRoleId: z.string().nullable().optional(),
     })
   ),
   asyncHandler(async (req, res) => {
     const user = await adminUserService.createAdmin(req.body);
-    successResponse(res, user, 'ادمین جدید اضافه شد', 201);
+    successResponse(res, user, 'کاربر پنل اضافه شد', 201);
   })
 );
 
 router.put(
   '/users/:id/role',
+  adminOnly,
   asyncHandler(async (req, res) => {
     const user = await adminUserService.updateRole(
       paramId(req.params.id),
-      req.body.role,
+      { role: req.body.role, accessRoleId: req.body.accessRoleId ?? null },
       req.user!.userId
     );
     successResponse(res, user, 'نقش کاربر به‌روزرسانی شد');
@@ -308,6 +343,7 @@ router.put(
 
 router.put(
   '/users/:id/toggle-active',
+  adminOnly,
   asyncHandler(async (req, res) => {
     const user = await adminUserService.toggleActive(paramId(req.params.id), req.user!.userId);
     successResponse(res, user, 'وضعیت کاربر به‌روزرسانی شد');
@@ -316,6 +352,7 @@ router.put(
 
 router.get(
   '/customers/frequent',
+  permCustomers,
   asyncHandler(async (_req, res) => {
     const customers = await customerService.getFrequentCustomers();
     successResponse(res, customers);
@@ -324,6 +361,7 @@ router.get(
 
 router.get(
   '/customers/:id',
+  permCustomers,
   asyncHandler(async (req, res) => {
     const customer = await customerService.getById(paramId(req.params.id));
     successResponse(res, customer);
@@ -340,6 +378,7 @@ const discountSchema = z.object({
 
 router.get(
   '/discounts',
+  permCoupons,
   asyncHandler(async (_req, res) => {
     const discounts = await discountService.getAll(true);
     successResponse(res, discounts);
@@ -348,6 +387,7 @@ router.get(
 
 router.post(
   '/discounts',
+  permCoupons,
   validate(discountSchema),
   asyncHandler(async (req, res) => {
     const data = {
@@ -362,6 +402,7 @@ router.post(
 
 router.put(
   '/discounts/:id',
+  permCoupons,
   asyncHandler(async (req, res) => {
     const data = {
       ...req.body,
@@ -375,6 +416,7 @@ router.put(
 
 router.delete(
   '/discounts/:id',
+  permCoupons,
   asyncHandler(async (req, res) => {
     await discountService.delete(paramId(req.params.id));
     successResponse(res, null, 'تخفیف حذف شد');
@@ -398,6 +440,7 @@ const couponSchema = z.object({
 
 router.get(
   '/coupons',
+  permCoupons,
   asyncHandler(async (_req, res) => {
     const coupons = await couponService.getAll(true);
     successResponse(res, coupons);
@@ -406,6 +449,7 @@ router.get(
 
 router.post(
   '/coupons',
+  permCoupons,
   validate(couponSchema),
   asyncHandler(async (req, res) => {
     const coupon = await couponService.create({
@@ -419,6 +463,7 @@ router.post(
 
 router.put(
   '/coupons/:id',
+  permCoupons,
   validate(couponSchema.partial()),
   asyncHandler(async (req, res) => {
     const coupon = await couponService.update(paramId(req.params.id), {
@@ -432,6 +477,7 @@ router.put(
 
 router.delete(
   '/coupons/:id',
+  permCoupons,
   asyncHandler(async (req, res) => {
     await couponService.delete(paramId(req.params.id));
     successResponse(res, null, 'کد تخفیف غیرفعال شد');
@@ -447,6 +493,7 @@ const contentUpdateSchema = z.object({
 
 router.get(
   '/content',
+  permContent,
   asyncHandler(async (_req, res) => {
     const pages = await contentService.getAll();
     successResponse(res, pages);
@@ -455,6 +502,7 @@ router.get(
 
 router.put(
   '/content/:slug',
+  permContent,
   validate(contentUpdateSchema),
   asyncHandler(async (req, res) => {
     const slug = paramId(req.params.slug);
@@ -487,6 +535,7 @@ router.get(
 
 router.post(
   '/tags',
+  permTags,
   validate(tagSchema),
   asyncHandler(async (req, res) => {
     const tag = await tagService.create(req.body);
@@ -496,6 +545,7 @@ router.post(
 
 router.put(
   '/tags/:id',
+  permTags,
   validate(tagSchema.partial()),
   asyncHandler(async (req, res) => {
     const tag = await tagService.update(paramId(req.params.id), req.body);
@@ -505,6 +555,7 @@ router.put(
 
 router.delete(
   '/tags/:id',
+  permTags,
   asyncHandler(async (req, res) => {
     await tagService.delete(paramId(req.params.id));
     successResponse(res, null, 'برچسب حذف شد');
@@ -523,6 +574,7 @@ const sliderSchema = z.object({
 
 router.get(
   '/sliders',
+  permSliders,
   asyncHandler(async (_req, res) => {
     const sliders = await sliderService.getAll();
     successResponse(res, sliders);
@@ -531,6 +583,7 @@ router.get(
 
 router.post(
   '/sliders',
+  permSliders,
   validate(sliderSchema),
   asyncHandler(async (req, res) => {
     const slider = await sliderService.create(req.body);
@@ -540,6 +593,7 @@ router.post(
 
 router.put(
   '/sliders/:id',
+  permSliders,
   validate(sliderSchema.partial()),
   asyncHandler(async (req, res) => {
     const slider = await sliderService.update(paramId(req.params.id), req.body);
@@ -549,6 +603,7 @@ router.put(
 
 router.delete(
   '/sliders/:id',
+  permSliders,
   asyncHandler(async (req, res) => {
     await sliderService.delete(paramId(req.params.id));
     successResponse(res, null, 'اسلایدر حذف شد');
@@ -557,6 +612,7 @@ router.delete(
 
 router.post(
   '/sliders/upload',
+  permSliders,
   upload.single('image'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
@@ -571,15 +627,21 @@ router.post(
 // Sales
 router.get(
   '/sales/overview',
+  permSales,
   asyncHandler(async (req, res) => {
-    const days = req.query.days ? parseInt(req.query.days as string) : 30;
-    const overview = await salesService.getOverview(days);
+    const overview = await salesService.getOverview({
+      days: req.query.days ? parseInt(req.query.days as string) : 30,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      productSearch: (req.query.productSearch || req.query.search) as string | undefined,
+    });
     successResponse(res, overview);
   })
 );
 
 router.get(
   '/sales/daily',
+  permSales,
   asyncHandler(async (req, res) => {
     const date = req.query.date ? new Date(req.query.date as string) : undefined;
     const daily = await salesService.getDailySales(date);
@@ -589,28 +651,42 @@ router.get(
 
 router.get(
   '/sales/top-products',
+  permSales,
   asyncHandler(async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-    const days = req.query.days ? parseInt(req.query.days as string) : 30;
-    const top = await salesService.getTopProducts(limit, days);
+    const top = await salesService.getTopProducts(limit, {
+      days: req.query.days ? parseInt(req.query.days as string) : 30,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      productSearch: req.query.productSearch as string | undefined,
+    });
     successResponse(res, top);
   })
 );
 
 router.get(
   '/sales/by-payment',
+  permSales,
   asyncHandler(async (req, res) => {
-    const days = req.query.days ? parseInt(req.query.days as string) : 30;
-    const data = await salesService.getByPaymentMethod(days);
+    const data = await salesService.getByPaymentMethod({
+      days: req.query.days ? parseInt(req.query.days as string) : 30,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+    });
     successResponse(res, data);
   })
 );
 
 router.get(
   '/sales/charts',
+  permSales,
   asyncHandler(async (req, res) => {
-    const days = req.query.days ? parseInt(req.query.days as string) : 30;
-    const chart = await salesService.getChartData(days);
+    const chart = await salesService.getChartData({
+      days: req.query.days ? parseInt(req.query.days as string) : 30,
+      dateFrom: req.query.dateFrom as string | undefined,
+      dateTo: req.query.dateTo as string | undefined,
+      productSearch: req.query.productSearch as string | undefined,
+    });
     successResponse(res, chart);
   })
 );
@@ -623,6 +699,7 @@ const customerGroupSchema = z.object({
 
 router.get(
   '/customer-groups',
+  permCustomers,
   asyncHandler(async (_req, res) => {
     const groups = await customerGroupService.getAll();
     successResponse(res, groups);
@@ -631,6 +708,7 @@ router.get(
 
 router.post(
   '/customer-groups',
+  permCustomers,
   validate(customerGroupSchema),
   asyncHandler(async (req, res) => {
     const group = await customerGroupService.create(req.body);
@@ -640,6 +718,7 @@ router.post(
 
 router.put(
   '/customer-groups/:id',
+  permCustomers,
   validate(customerGroupSchema.partial()),
   asyncHandler(async (req, res) => {
     const group = await customerGroupService.update(paramId(req.params.id), req.body);
@@ -649,9 +728,83 @@ router.put(
 
 router.delete(
   '/customer-groups/:id',
+  permCustomers,
   asyncHandler(async (req, res) => {
     await customerGroupService.delete(paramId(req.params.id));
     successResponse(res, null, 'گروه حذف شد');
+  })
+);
+
+const accessRoleSchema = z.object({
+  name: z.string().min(2),
+  description: z.string().optional().nullable(),
+  permissions: z.array(z.string()),
+});
+
+router.get(
+  '/access-roles',
+  adminOnly,
+  asyncHandler(async (_req, res) => {
+    const roles = await accessRoleService.getAll();
+    successResponse(res, {
+      roles,
+      catalog: PANEL_PERMISSIONS.filter((key) => key !== 'users'),
+    });
+  })
+);
+
+router.post(
+  '/access-roles',
+  adminOnly,
+  validate(accessRoleSchema),
+  asyncHandler(async (req, res) => {
+    const role = await accessRoleService.create(req.body);
+    successResponse(res, role, 'نقش جدید ساخته شد', 201);
+  })
+);
+
+router.put(
+  '/access-roles/:id',
+  adminOnly,
+  validate(accessRoleSchema.partial()),
+  asyncHandler(async (req, res) => {
+    const role = await accessRoleService.update(paramId(req.params.id), req.body);
+    successResponse(res, role, 'نقش به‌روزرسانی شد');
+  })
+);
+
+router.delete(
+  '/access-roles/:id',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    await accessRoleService.delete(paramId(req.params.id));
+    successResponse(res, null, 'نقش حذف شد');
+  })
+);
+
+const newOrderSmsSchema = z.object({
+  enabled: z.boolean(),
+  phones: z.array(z.string().min(10).max(15)).max(30),
+  includePanelStaff: z.boolean(),
+  messageTemplate: z.string().min(5).max(500),
+});
+
+router.get(
+  '/settings/new-order-sms',
+  permSettings,
+  asyncHandler(async (_req, res) => {
+    const settings = await settingsService.getNewOrderSms();
+    successResponse(res, settings);
+  })
+);
+
+router.put(
+  '/settings/new-order-sms',
+  permSettings,
+  validate(newOrderSmsSchema),
+  asyncHandler(async (req, res) => {
+    const settings = await settingsService.updateNewOrderSms(req.body);
+    successResponse(res, settings, 'تنظیمات پیامک ذخیره شد');
   })
 );
 

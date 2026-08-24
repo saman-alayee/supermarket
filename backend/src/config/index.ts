@@ -1,6 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+function normalizeAdminPhone(phone: string): string {
+  let normalized = phone
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/\D/g, '');
+  if (normalized.startsWith('98')) normalized = `0${normalized.slice(2)}`;
+  if (!normalized.startsWith('0') && normalized.length === 10) normalized = `0${normalized}`;
+  return normalized;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -35,7 +44,7 @@ export const config = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  adminPhone: process.env.ADMIN_PHONE || '09120000000',
+  adminPhone: normalizeAdminPhone(process.env.ADMIN_PHONE || '09120000000'),
   adminPhones: Array.from(
     new Set(
       [
@@ -44,7 +53,7 @@ export const config = {
           .split(',')
           .map((phone) => phone.trim())
           .filter(Boolean),
-      ]
+      ].map(normalizeAdminPhone)
     )
   ),
   adminPassword: process.env.ADMIN_PASSWORD || 'admin1234',

@@ -16,4 +16,9 @@ export default defineNuxtRouteMiddleware((to) => {
       `/admin/login?redirect=${encodeURIComponent(to.fullPath)}&error=not-admin`
     );
   }
+
+  const { canAccessPath } = useAdminAccess();
+  if (!canAccessPath(to.path)) {
+    return navigateTo('/admin');
+  }
 });

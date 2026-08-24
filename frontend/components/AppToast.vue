@@ -6,15 +6,17 @@ const hasBottomNav = computed(() => {
   const path = route.path;
   return !path.startsWith('/admin') && !path.startsWith('/auth');
 });
+
+const isAdmin = computed(() => route.path.startsWith('/admin'));
 </script>
 
 <template>
   <div
     :class="[
-      'fixed z-[300] flex flex-col gap-2 pointer-events-none inset-x-3 md:bottom-auto md:top-4 md:start-auto md:end-4 md:inset-x-auto md:items-end',
-      hasBottomNav
-        ? 'bottom-[calc(env(safe-area-inset-bottom)+5.5rem)]'
-        : 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]',
+      'fixed z-[300] flex flex-col gap-2 pointer-events-none inset-x-3 md:start-auto md:end-4 md:inset-x-auto md:items-end',
+      isAdmin || !hasBottomNav
+        ? 'top-[calc(env(safe-area-inset-top)+4.5rem)] md:top-4'
+        : 'bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] md:bottom-auto md:top-4',
     ]"
   >
     <TransitionGroup name="toast">

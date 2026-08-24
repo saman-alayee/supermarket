@@ -39,11 +39,111 @@ export interface Slider {
 
 export type SliderPlacement = 'HOME_TOP' | 'HOME_MID';
 
+export type UserRole = 'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF';
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  CUSTOMER: 'مشتری',
+  ADMIN: 'مدیر',
+  SUPERVISOR: 'مسئول',
+  STAFF: 'پرسنل',
+};
+
+export type PanelPermission =
+  | 'dashboard'
+  | 'orders'
+  | 'products'
+  | 'sales'
+  | 'categories'
+  | 'tags'
+  | 'sliders'
+  | 'customers'
+  | 'coupons'
+  | 'content'
+  | 'settings'
+  | 'users';
+
+export const PERMISSION_LABELS: Record<PanelPermission, string> = {
+  dashboard: 'داشبورد',
+  orders: 'سفارش‌ها',
+  products: 'محصولات',
+  sales: 'گزارش فروش',
+  categories: 'دسته‌بندی',
+  tags: 'برچسب‌ها',
+  sliders: 'اسلایدرها',
+  customers: 'مشتریان',
+  coupons: 'کدهای تخفیف',
+  content: 'قوانین و محتوا',
+  settings: 'تنظیمات',
+  users: 'کاربران و نقش‌ها',
+};
+
+export const BUILTIN_ROLE_GUIDE: Array<{
+  role: UserRole;
+  title: string;
+  summary: string;
+  permissions: PanelPermission[];
+}> = [
+  {
+    role: 'ADMIN',
+    title: 'مدیر',
+    summary: 'دسترسی کامل به پنل؛ ساخت کاربر، نقش سفارشی و همه بخش‌ها.',
+    permissions: [
+      'dashboard',
+      'orders',
+      'products',
+      'sales',
+      'categories',
+      'tags',
+      'sliders',
+      'customers',
+      'coupons',
+      'content',
+      'settings',
+      'users',
+    ],
+  },
+  {
+    role: 'SUPERVISOR',
+    title: 'مسئول',
+    summary: 'همه بخش‌های عملیاتی و گزارش‌ها؛ بدون مدیریت کاربران و نقش‌ها.',
+    permissions: [
+      'dashboard',
+      'orders',
+      'products',
+      'sales',
+      'categories',
+      'tags',
+      'sliders',
+      'customers',
+      'coupons',
+      'content',
+      'settings',
+    ],
+  },
+  {
+    role: 'STAFF',
+    title: 'پرسنل',
+    summary: 'کار روزمره فروشگاه: سفارش‌ها و محصولات (جمع‌آوری و موجودی).',
+    permissions: ['dashboard', 'orders', 'products'],
+  },
+];
+
+export interface AccessRole {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissions: PanelPermission[];
+  _count?: { users: number };
+}
+
 export interface Product {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  barcode?: string | null;
+  productionDate?: string | null;
+  expiryDate?: string | null;
   price: number;
   discountPrice: number | null;
   effectivePrice: number;
@@ -90,11 +190,14 @@ export interface User {
   phone: string;
   firstName: string | null;
   lastName: string | null;
-  role: 'CUSTOMER' | 'ADMIN';
+  role: UserRole;
   isActive?: boolean;
   customerGroupId?: string | null;
   customerGroup?: CustomerGroup | null;
   hasPassword?: boolean;
+  accessRoleId?: string | null;
+  accessRole?: { id: string; name: string; permissions: PanelPermission[] } | null;
+  permissions?: PanelPermission[];
 }
 
 export interface CustomerGroup {
@@ -192,7 +295,7 @@ export interface OrderItem {
   price: number;
   name: string;
   subtotal?: number;
-  product?: { image: string | null; slug: string };
+  product?: { image: string | null; slug: string; barcode?: string | null };
 }
 
 export type OrderStatus =

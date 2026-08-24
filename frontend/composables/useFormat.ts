@@ -1,4 +1,4 @@
-import { formatJalaliDate, getTodayJalali } from '~/utils/jalali';
+import { formatJalaliDate, formatJalaliMonthYear, getTodayJalali } from '~/utils/jalali';
 
 export function toPersianDigits(num: number | string): string {
   const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
@@ -27,6 +27,10 @@ export function formatDate(date: string | Date): string {
 
 export function formatShortDate(date: string | Date): string {
   return formatJalaliDate(date, { short: true });
+}
+
+export function formatMonthYear(date: string | Date): string {
+  return formatJalaliMonthYear(date);
 }
 
 export function formatJalaliYear(): string {
@@ -61,6 +65,7 @@ export function useFormat() {
     formatPriceCompact,
     formatDate,
     formatShortDate,
+    formatMonthYear,
     formatJalaliYear,
     resolveMediaUrl,
     getProductImage,

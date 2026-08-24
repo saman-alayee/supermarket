@@ -1,7 +1,9 @@
+import type { UserRole } from '~/types';
+
 export interface JwtPayload {
   userId?: string;
   phone?: string;
-  role?: 'CUSTOMER' | 'ADMIN';
+  role?: UserRole;
 }
 
 export function parseJwtPayload(token: string): JwtPayload | null {

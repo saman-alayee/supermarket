@@ -80,7 +80,7 @@ export class CustomerService {
     page = 1,
     limit = 20,
     search?: string,
-    role?: 'CUSTOMER' | 'ADMIN',
+    role?: 'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF',
     paymentMethod?: string,
     customerGroupId?: string
   ) {
@@ -107,6 +107,8 @@ export class CustomerService {
           firstName: true,
           lastName: true,
           role: true,
+          accessRoleId: true,
+          accessRole: { select: { id: true, name: true, permissions: true } },
           isActive: true,
           customerGroupId: true,
           customerGroup: { select: { id: true, name: true } },
@@ -306,30 +308,56 @@ export class CustomerService {
 }
 
 export class AdminUserService {
-  async updateRole(userId: string, role: 'CUSTOMER' | 'ADMIN', actorId: string) {
+  async updateRole(
+    userId: string,
+    payload: { role: 'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF'; accessRoleId?: string | null },
+    actorId: string
+  ) {
+    const role = payload.role;
     if (userId === actorId && role !== 'ADMIN') {
       throw new AppError(400, 'نمی‌توانید نقش خودتان را تغییر دهید');
+    }
+
+    const allowed: Array<'CUSTOMER' | 'ADMIN' | 'SUPERVISOR' | 'STAFF'> = [
+      'CUSTOMER',
+      'ADMIN',
+      'SUPERVISOR',
+      'STAFF',
+    ];
+    if (!allowed.includes(role)) {
+      throw new AppError(400, 'نقش نامعتبر است');
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(404, 'کاربر یافت نشد');
 
-    if (user.role === 'ADMIN' && role === 'CUSTOMER') {
+    if (user.role === 'ADMIN' && role !== 'ADMIN') {
       const adminCount = await prisma.user.count({ where: { role: 'ADMIN', isActive: true } });
       if (adminCount <= 1) {
-        throw new AppError(400, 'حداقل یک ادمین باید در سیستم باقی بماند');
+        throw new AppError(400, 'حداقل یک مدیر باید در سیستم باقی بماند');
       }
+    }
+
+    let accessRoleId: string | null = null;
+    let finalRole = role;
+    if (payload.accessRoleId) {
+      const custom = await prisma.accessRole.findUnique({ where: { id: payload.accessRoleId } });
+      if (!custom) throw new AppError(400, 'نقش سفارشی یافت نشد');
+      accessRoleId = custom.id;
+      finalRole = 'STAFF';
     }
 
     return prisma.user.update({
       where: { id: userId },
-      data: { role },
+      data: { role: finalRole, accessRoleId },
       select: {
         id: true,
         phone: true,
         firstName: true,
         lastName: true,
         role: true,
+        accessRoleId: true,
+        accessRole: { select: { id: true, name: true, permissions: true } },
         isActive: true,
         createdAt: true,
       },
@@ -341,8 +369,18 @@ export class AdminUserService {
     firstName?: string;
     lastName?: string;
     password?: string;
+    role?: 'ADMIN' | 'SUPERVISOR' | 'STAFF';
+    accessRoleId?: string | null;
   }) {
     const phone = normalizePhone(data.phone);
+    let role = data.role ?? 'ADMIN';
+    let accessRoleId: string | null = null;
+    if (data.accessRoleId) {
+      const custom = await prisma.accessRole.findUnique({ where: { id: data.accessRoleId } });
+      if (!custom) throw new AppError(400, 'نقش سفارشی یافت نشد');
+      accessRoleId = custom.id;
+      role = 'STAFF';
+    }
     const passwordHash = data.password
       ? await (await import('bcryptjs')).default.hash(data.password, 10)
       : undefined;
@@ -350,7 +388,8 @@ export class AdminUserService {
     const user = await prisma.user.upsert({
       where: { phone },
       update: {
-        role: 'ADMIN',
+        role,
+        accessRoleId,
         firstName: data.firstName ?? undefined,
         lastName: data.lastName ?? undefined,
         isActive: true,
@@ -358,9 +397,10 @@ export class AdminUserService {
       },
       create: {
         phone,
-        role: 'ADMIN',
-        firstName: data.firstName ?? 'ادمین',
-        lastName: data.lastName ?? 'سیستم',
+        role,
+        accessRoleId,
+        firstName: data.firstName ?? 'کاربر',
+        lastName: data.lastName ?? 'پنل',
         ...(passwordHash ? { passwordHash } : {}),
       },
       select: {
@@ -369,6 +409,8 @@ export class AdminUserService {
         firstName: true,
         lastName: true,
         role: true,
+        accessRoleId: true,
+        accessRole: { select: { id: true, name: true, permissions: true } },
         isActive: true,
         createdAt: true,
       },

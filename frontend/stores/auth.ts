@@ -22,8 +22,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn = computed(() => !!token.value);
   const isAdmin = computed(() => {
-    if (user.value?.role === 'ADMIN') return true;
-    return getRoleFromToken(token.value) === 'ADMIN';
+    const fromUser = user.value?.role;
+    const fromToken = getRoleFromToken(token.value);
+    const role = (fromUser && (fromUser === 'ADMIN' || fromUser === 'SUPERVISOR' || fromUser === 'STAFF')
+      ? fromUser
+      : fromToken) ?? fromUser;
+    return role === 'ADMIN' || role === 'SUPERVISOR' || role === 'STAFF';
   });
   const fullName = computed(() => {
     if (!user.value) return '';
@@ -171,10 +175,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchProfile() {
     const api = useApi();
-    const { data } = await api.get<User>('/auth/profile');
-    user.value = data;
-    userCookie.value = JSON.stringify(data);
-    return data;
+    const { data } = await api.get<User & { token?: string }>('/auth/profile');
+    const { token: freshToken, ...profile } = data;
+    user.value = profile;
+    userCookie.value = JSON.stringify(profile);
+    if (freshToken) {
+      token.value = freshToken;
+      tokenCookie.value = freshToken;
+    }
+    syncUserFromToken();
+    return profile;
   }
 
   async function updateProfile(data: { firstName?: string; lastName?: string }) {

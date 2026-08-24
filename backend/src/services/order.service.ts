@@ -261,6 +261,9 @@ export class OrderService {
       });
     }
 
+    // Fire-and-forget operator alarm (SMS); UI also polls for sound
+    void smsService.notifyOperatorsNewOrder(order.orderNumber, order.customerName);
+
     return {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -297,7 +300,7 @@ export class OrderService {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        items: { include: { product: { select: { image: true, slug: true } } } },
+        items: { include: { product: { select: { image: true, slug: true, barcode: true } } } },
         statusLogs: { orderBy: { createdAt: 'desc' } },
       },
     });
@@ -353,7 +356,7 @@ export class OrderService {
       prisma.order.findMany({
         where,
         include: {
-          items: true,
+          items: { include: { product: { select: { image: true, slug: true, barcode: true } } } },
           user: { select: { id: true, phone: true, firstName: true, lastName: true } },
           statusLogs: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
@@ -477,7 +480,7 @@ export class OrderService {
       quantity: number;
       price: { toNumber?: () => number } | number | bigint;
       name: string;
-      product?: { image: string | null; slug: string };
+      product?: { image: string | null; slug: string; barcode?: string | null };
     }>;
     user?: { id: string; phone: string; firstName: string | null; lastName: string | null } | null;
     statusLogs?: Array<{ id: string; status: OrderStatus; note: string | null; createdAt: Date }>;

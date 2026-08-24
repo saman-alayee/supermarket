@@ -41,6 +41,7 @@ router.get(
       ? ids.split(',').map((id) => id.trim()).filter(Boolean)
       : undefined;
 
+    const parsedLimit = limit ? parseInt(limit as string) : idList?.length || 20;
     const result = await productService.getAll({
       categoryId: categoryId as string,
       categorySlug: category as string,
@@ -51,7 +52,7 @@ router.get(
       discounted: discounted === 'true',
       isNew: isNew === 'true',
       page: page ? parseInt(page as string) : 1,
-      limit: limit ? parseInt(limit as string) : idList?.length || 20,
+      limit: Math.min(parsedLimit, idList?.length ? 100 : 50),
     });
     successResponse(res, result);
   })

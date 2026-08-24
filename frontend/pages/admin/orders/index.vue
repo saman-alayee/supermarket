@@ -14,8 +14,8 @@ const orders = ref<Order[]>([]);
 const loading = ref(true);
 const search = ref('');
 const statusFilter = ref((route.query.status as OrderStatus) || '');
-const dateFrom = ref('');
-const dateTo = ref('');
+const dateFrom = ref<string | null>(null);
+const dateTo = ref<string | null>(null);
 const selectedOrder = ref<Order | null>(null);
 const statusNote = ref('');
 const statusError = ref('');
@@ -100,6 +100,10 @@ function closeOrder() {
   statusError.value = '';
 }
 
+function printOrderSlip(orderId: string) {
+  window.open(`/admin/orders/print/${orderId}`, '_blank', 'noopener');
+}
+
 async function updateStatus(orderId: string, status: OrderStatus) {
   statusError.value = '';
   try {
@@ -132,6 +136,7 @@ function nextStatuses(status: OrderStatus) {
 }
 
 watch(statusFilter, loadOrders);
+watch([dateFrom, dateTo], loadOrders);
 
 useHead({ title: 'سفارش‌ها - پنل مدیریت' });
 </script>
@@ -152,8 +157,8 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
         @keyup.enter="loadOrders"
       />
       <button class="btn-secondary text-sm" @click="loadOrders">جستجو</button>
-      <input v-model="dateFrom" type="date" class="input-field md:max-w-[160px]" title="از تاریخ" />
-      <input v-model="dateTo" type="date" class="input-field md:max-w-[160px]" title="تا تاریخ" />
+      <AppDatePicker v-model="dateFrom" placeholder="از تاریخ" class="md:max-w-[180px]" />
+      <AppDatePicker v-model="dateTo" placeholder="تا تاریخ" class="md:max-w-[180px]" :min="dateFrom" />
     </div>
 
     <div class="flex gap-2 overflow-x-auto mb-6">
@@ -184,7 +189,17 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
       >
         <div class="flex items-center justify-between mb-2">
           <span class="font-bold" dir="ltr">{{ order.orderNumber }}</span>
-          <OrderStatusBadge :status="order.status" />
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              title="چاپ فیش جمع‌آوری"
+              @click.stop="printOrderSlip(order.id)"
+            >
+              <AppIcon name="lucide:printer" size="sm" />
+            </button>
+            <OrderStatusBadge :status="order.status" />
+          </div>
         </div>
         <div class="text-sm text-gray-600">{{ order.customerName }} — {{ order.customerPhone }}</div>
         <div class="flex items-center justify-between text-sm mt-2">
@@ -229,6 +244,14 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
               <OrderStatusBadge :status="selectedOrder.status" />
             </div>
           </div>
+          <button
+            type="button"
+            class="p-2 rounded-xl hover:bg-gray-100 text-gray-500 shrink-0"
+            aria-label="چاپ فیش جمع‌آوری"
+            @click="printOrderSlip(selectedOrder.id)"
+          >
+            <AppIcon name="lucide:printer" size="lg" />
+          </button>
           <button
             type="button"
             class="p-2 rounded-xl hover:bg-gray-100 text-gray-500 shrink-0"
@@ -340,6 +363,9 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium text-gray-800 leading-snug">{{ item.name }}</p>
                 <p class="text-xs text-gray-500 mt-0.5">تعداد: {{ item.quantity }}</p>
+                <p v-if="item.product?.barcode" class="text-[11px] text-gray-400 font-mono mt-0.5" dir="ltr">
+                  {{ item.product.barcode }}
+                </p>
               </div>
               <span class="shrink-0 text-sm font-bold text-gray-800">
                 {{ formatPrice(item.subtotal || item.price * item.quantity) }}
@@ -370,7 +396,13 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
           </p>
         </div>
 
-        <div class="px-4 pb-4">
+        <div class="px-4 pb-4 flex flex-col gap-2">
+          <button
+            class="btn-secondary w-full text-sm"
+            @click="printOrderSlip(selectedOrder.id)"
+          >
+            چاپ فیش جمع‌آوری
+          </button>
           <button
             v-if="selectedOrder.status === 'PREPARING' || selectedOrder.status === 'SHIPPED'"
             class="btn-secondary w-full text-sm"
