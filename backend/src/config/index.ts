@@ -36,6 +36,17 @@ export const config = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   adminPhone: process.env.ADMIN_PHONE || '09120000000',
+  adminPhones: Array.from(
+    new Set(
+      [
+        process.env.ADMIN_PHONE || '09120000000',
+        ...(process.env.ADMIN_PHONES || '')
+          .split(',')
+          .map((phone) => phone.trim())
+          .filter(Boolean),
+      ]
+    )
+  ),
   adminPassword: process.env.ADMIN_PASSWORD || 'admin1234',
   neshanApiKey: process.env.NESHAN_API_KEY || '',
 };

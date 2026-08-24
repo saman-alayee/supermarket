@@ -33,7 +33,9 @@ const categorySections = ref<HomeCategorySection[]>([]);
 const sectionsLoading = ref(true);
 const dealTab = ref<'discounted' | 'featured'>('discounted');
 
-const visibleCategories = computed(() => (categories.value ?? []).slice(0, 8));
+const homeCategories = computed(() => categories.value ?? []);
+const categoryStripRef = ref<HTMLElement | null>(null);
+useHorizontalDragScroll(categoryStripRef);
 
 const hasDeals = computed(() => discountedProducts.value.length > 0 || featuredProducts.value.length > 0);
 const showDealTabs = computed(() => discountedProducts.value.length > 0 && featuredProducts.value.length > 0);
@@ -162,12 +164,14 @@ useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
       </div>
     </section>
 
-    <!-- Categories grid -->
-    <section v-if="visibleCategories.length" class="px-4 py-4">
-      <HomeSection title="دسته‌بندی‌ها" to="/categories" />
-      <div class="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-6 md:grid-cols-8">
+    <!-- Categories: single-row horizontal slider -->
+    <section v-if="homeCategories.length" class="py-4">
+      <div class="px-4">
+        <HomeSection title="دسته‌بندی‌ها" to="/categories" />
+      </div>
+      <div ref="categoryStripRef" dir="rtl" class="category-home-strip px-4">
         <CategoryCard
-          v-for="category in visibleCategories"
+          v-for="category in homeCategories"
           :key="category.id"
           :category="category"
           size="md"

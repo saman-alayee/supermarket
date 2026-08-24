@@ -127,6 +127,24 @@
     scroll-snap-type: none;
   }
 
+  .category-home-strip {
+    @apply flex flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain scrollbar-hide pb-1 cursor-grab select-none snap-x snap-mandatory;
+    direction: rtl;
+    max-width: 100%;
+    min-width: 0;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-home-strip > * {
+    @apply snap-start;
+  }
+
+  .category-home-strip.is-dragging {
+    @apply cursor-grabbing;
+    scroll-snap-type: none;
+  }
+
   .product-card-grid {
     @apply grid auto-rows-fr gap-3 sm:gap-4 md:gap-5 items-stretch;
     grid-template-columns: repeat(2, minmax(0, 1fr));

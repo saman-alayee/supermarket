@@ -40,7 +40,7 @@ const resolving = ref(false);
 const mapLoading = ref(true);
 const mapError = ref('');
 
-const KIASHAHR = { lat: 37.4255, lng: 49.953 };
+const KIASHAHR = { lat: 37.419493, lng: 49.946101 };
 
 let L: typeof import('leaflet') | null = null;
 let map: LeafletMap | null = null;
@@ -397,19 +397,25 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-if="!readonly && !mapLoading" class="absolute top-3 end-3 z-[402]">
+      <div v-if="!readonly && !mapLoading" class="absolute top-3 end-3 z-[402] flex flex-col items-end gap-1.5">
         <button
           type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-100 bg-white shadow-md"
+          class="flex items-center gap-2 rounded-xl border border-primary-100 bg-white px-3 py-2 shadow-md text-xs font-semibold text-primary-700 hover:bg-primary-50 transition-colors"
           :disabled="locating"
+          title="موقعیت فعلی من را روی نقشه ثبت کن"
+          aria-label="ثبت موقعیت فعلی من روی نقشه"
           @click="useCurrentLocation"
         >
           <AppIcon
             :name="locating ? 'lucide:loader-2' : 'lucide:crosshair'"
             size="sm"
-            :class="locating ? 'animate-spin text-primary-600' : 'text-gray-700'"
+            :class="locating ? 'animate-spin text-primary-600' : 'text-primary-600'"
           />
+          <span>{{ locating ? 'در حال یافتن...' : 'موقعیت من' }}</span>
         </button>
+        <span class="max-w-[9.5rem] rounded-lg bg-white/95 px-2 py-1 text-[10px] leading-snug text-gray-600 shadow-sm text-end">
+          برای ثبت خودکار لوکیشن روی این دکمه بزنید
+        </span>
       </div>
 
       <div
@@ -424,6 +430,9 @@ onUnmounted(() => {
     <div v-if="!readonly" class="space-y-1">
       <p class="text-xs leading-relaxed text-gray-500">
         {{ geocode ? 'نقشه را جابه‌جا کنید تا پین دقیقاً روی محل تحویل قرار بگیرد.' : 'نقشه را روی محل تحویل در کیاشهر بگذارید؛ آدرس را در فرم وارد کنید.' }}
+      </p>
+      <p class="text-xs leading-relaxed text-primary-700 bg-primary-50/70 rounded-lg px-2.5 py-2">
+        دکمه «موقعیت من» (آیکن نشانه) برای ثبت خودکار محل فعلی شما روی نقشه است. اگر دسترسی موقعیت رد شد، نقشه را با دست جابه‌جا کنید.
       </p>
       <p v-if="hasCoords()" class="text-[11px] text-gray-400" dir="ltr">
         {{ latitude?.toFixed(6) }}, {{ longitude?.toFixed(6) }}

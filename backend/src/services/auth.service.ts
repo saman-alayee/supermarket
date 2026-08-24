@@ -219,21 +219,21 @@ export class AuthService {
 
   private async findOrCreateUser(phone: string) {
     let user = await prisma.user.findUnique({ where: { phone } });
+    const isAdminPhone = config.adminPhones.includes(phone);
 
     if (!user) {
-      const isAdmin = phone === config.adminPhone;
       user = await prisma.user.create({
         data: {
           phone,
-          role: isAdmin ? 'ADMIN' : 'CUSTOMER',
-          firstName: isAdmin ? 'مدیر' : undefined,
-          lastName: isAdmin ? 'سیستم' : undefined,
+          role: isAdminPhone ? 'ADMIN' : 'CUSTOMER',
+          firstName: isAdminPhone ? 'مدیر' : undefined,
+          lastName: isAdminPhone ? 'سیستم' : undefined,
         },
       });
       return user;
     }
 
-    if (phone === config.adminPhone && user.role !== 'ADMIN') {
+    if (isAdminPhone && user.role !== 'ADMIN') {
       user = await prisma.user.update({
         where: { id: user.id },
         data: { role: 'ADMIN' },

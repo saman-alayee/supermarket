@@ -791,22 +791,24 @@ async function seedCart() {
 async function main() {
   console.log('🌱 Seeding database...');
 
-  await prisma.user.upsert({
-    where: { phone: config.adminPhone },
-    update: {
-      role: 'ADMIN' as UserRole,
-      firstName: 'مدیر',
-      lastName: 'KIAA KALA',
-      isActive: true,
-    },
-    create: {
-      phone: config.adminPhone,
-      firstName: 'مدیر',
-      lastName: 'KIAA KALA',
-      role: 'ADMIN' as UserRole,
-    },
-  });
-  console.log(`✅ Admin user: ${config.adminPhone}`);
+  for (const adminPhone of config.adminPhones) {
+    await prisma.user.upsert({
+      where: { phone: adminPhone },
+      update: {
+        role: 'ADMIN' as UserRole,
+        firstName: 'مدیر',
+        lastName: 'KIAA KALA',
+        isActive: true,
+      },
+      create: {
+        phone: adminPhone,
+        firstName: 'مدیر',
+        lastName: 'KIAA KALA',
+        role: 'ADMIN' as UserRole,
+      },
+    });
+    console.log(`✅ Admin user: ${adminPhone}`);
+  }
 
   for (const customer of demoCustomers) {
     await prisma.user.upsert({

@@ -6,7 +6,6 @@ import { cartService } from './cart.service';
 import { couponService } from './coupon.service';
 import { notificationService } from './notification.service';
 import { smsService } from './sms.service';
-import { authService } from './auth.service';
 import { normalizePhone } from '../utils/normalize';
 
 export type OrderStatus =
@@ -150,15 +149,6 @@ export class OrderService {
       deliveryFee,
     };
 
-    if (input.paymentMethod === 'SOCIAL_SECURITY') {
-      const otpCode = paymentDetailsToStore.otpCode;
-      if (!otpCode || typeof otpCode !== 'string') {
-        throw new AppError(400, 'کد تأیید پیامکی برای پرداخت تامین اجتماعی الزامی است');
-      }
-      await authService.verifyCheckoutOtp(input.customerPhone, otpCode);
-      delete paymentDetailsToStore.otpCode;
-      paymentDetailsToStore.otpVerified = true;
-    }
     const cleanedPaymentDetails = Object.fromEntries(
       Object.entries(paymentDetailsToStore).filter(
         ([, value]) => value != null && (typeof value === 'number' || String(value).trim() !== '')

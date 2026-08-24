@@ -7,7 +7,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' });
 const route = useRoute();
 const api = useApi();
 const toast = useToast();
-const { formatPrice, formatShortDate } = useFormat();
+const { formatPrice, formatShortDate, getProductImage } = useFormat();
 const { mapsLink } = useGeocoding();
 
 const orders = ref<Order[]>([]);
@@ -42,6 +42,34 @@ function paymentLabel(method?: Order['paymentMethod']) {
   return method ? PAYMENT_METHOD_LABELS[method] : '—';
 }
 
+function deliveryMethodOf(order: Order): 'FREE' | 'JET' | null {
+  const method = order.paymentDetails?.deliveryMethod;
+  if (method === 'JET' || method === 'FREE') return method;
+  return null;
+}
+
+function deliveryLabel(order: Order) {
+  const method = deliveryMethodOf(order);
+  if (method === 'JET') return 'ارسال جت (فوری)';
+  if (method === 'FREE') return 'ارسال رایگان / معمولی';
+  return 'نامشخص';
+}
+
+function paymentDetailRows(order: Order) {
+  const details = order.paymentDetails;
+  if (!details) return [];
+
+  const rows: { label: string; value: string }[] = [];
+  if (details.nationalId) rows.push({ label: 'کد ملی', value: String(details.nationalId) });
+  if (details.salaryCard) rows.push({ label: 'شماره کارت حقوقی', value: String(details.salaryCard) });
+  if (details.taraId) rows.push({ label: 'شناسه خرید تارا', value: String(details.taraId) });
+  if (details.walletNote) rows.push({ label: 'توضیحات کیف پول', value: String(details.walletNote) });
+  if (details.otpVerified === true || details.otpVerified === 'true') {
+    rows.push({ label: 'تأیید پیامک', value: 'انجام شده' });
+  }
+  return rows;
+}
+
 onMounted(loadOrders);
 
 async function loadOrders() {
@@ -60,9 +88,16 @@ async function loadOrders() {
 }
 
 async function openOrder(orderId: string) {
+  statusError.value = '';
   const { data } = await api.get<Order>(`/admin/orders/${orderId}`);
   selectedOrder.value = data;
   statusNote.value = '';
+}
+
+function closeOrder() {
+  selectedOrder.value = null;
+  statusNote.value = '';
+  statusError.value = '';
 }
 
 async function updateStatus(orderId: string, status: OrderStatus) {
@@ -140,36 +175,71 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
 
     <LoadingSpinner :show="loading" />
 
-    <div v-if="!loading" class="grid lg:grid-cols-2 gap-4">
-      <div class="space-y-3">
-        <div
-          v-for="order in orders"
-          :key="order.id"
-          class="card p-4 cursor-pointer hover:ring-2 hover:ring-primary-100 transition-all"
-          :class="selectedOrder?.id === order.id ? 'ring-2 ring-primary-300' : ''"
-          @click="openOrder(order.id)"
-        >
-          <div class="flex items-center justify-between mb-2">
-            <span class="font-bold" dir="ltr">{{ order.orderNumber }}</span>
-            <OrderStatusBadge :status="order.status" />
-          </div>
-          <div class="text-sm text-gray-600">{{ order.customerName }} — {{ order.customerPhone }}</div>
-          <div class="flex items-center justify-between text-sm mt-2">
-            <span class="text-gray-400">{{ formatShortDate(order.createdAt) }}</span>
-            <span class="font-bold">{{ formatPrice(order.totalPrice) }}</span>
-          </div>
-          <p v-if="order.paymentMethod && order.paymentMethod !== 'CASH_AT_DOOR'" class="text-xs text-indigo-600 mt-1">
-            {{ paymentLabel(order.paymentMethod) }}
-          </p>
+    <div v-if="!loading" class="space-y-3 max-w-3xl">
+      <div
+        v-for="order in orders"
+        :key="order.id"
+        class="card p-4 cursor-pointer hover:ring-2 hover:ring-primary-100 transition-all"
+        @click="openOrder(order.id)"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-bold" dir="ltr">{{ order.orderNumber }}</span>
+          <OrderStatusBadge :status="order.status" />
         </div>
-        <EmptyState v-if="!orders.length" message="سفارشی یافت نشد" />
+        <div class="text-sm text-gray-600">{{ order.customerName }} — {{ order.customerPhone }}</div>
+        <div class="flex items-center justify-between text-sm mt-2">
+          <span class="text-gray-400">{{ formatShortDate(order.createdAt) }}</span>
+          <span class="font-bold">{{ formatPrice(order.totalPrice) }}</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5 mt-2">
+          <span
+            v-if="deliveryMethodOf(order) === 'JET'"
+            class="inline-flex items-center gap-1 rounded-full bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-0.5"
+          >
+            جت
+          </span>
+          <span
+            v-else-if="deliveryMethodOf(order) === 'FREE'"
+            class="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 text-[11px] font-medium px-2 py-0.5"
+          >
+            رایگان
+          </span>
+          <span
+            v-if="order.paymentMethod && order.paymentMethod !== 'CASH_AT_DOOR'"
+            class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium px-2 py-0.5"
+          >
+            {{ paymentLabel(order.paymentMethod) }}
+          </span>
+        </div>
       </div>
+      <EmptyState v-if="!orders.length" message="سفارشی یافت نشد" />
+    </div>
 
-      <div v-if="selectedOrder" class="card p-4 h-fit sticky top-24">
-        <h2 class="font-bold text-lg mb-1" dir="ltr">{{ selectedOrder.orderNumber }}</h2>
-        <OrderStatusBadge :status="selectedOrder.status" />
+    <!-- Order detail modal -->
+    <div
+      v-if="selectedOrder"
+      class="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-4"
+      @click.self="closeOrder"
+    >
+      <div class="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-3xl max-h-[92vh] overflow-y-auto shadow-xl">
+        <div class="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="font-bold text-lg truncate" dir="ltr">{{ selectedOrder.orderNumber }}</h2>
+            <div class="mt-1">
+              <OrderStatusBadge :status="selectedOrder.status" />
+            </div>
+          </div>
+          <button
+            type="button"
+            class="p-2 rounded-xl hover:bg-gray-100 text-gray-500 shrink-0"
+            aria-label="بستن"
+            @click="closeOrder"
+          >
+            <AppIcon name="lucide:x" size="lg" />
+          </button>
+        </div>
 
-        <div class="mt-4 space-y-2 text-sm">
+        <div class="p-4 space-y-2 text-sm">
           <p><span class="text-gray-500">مشتری:</span> {{ selectedOrder.customerName }}</p>
           <p dir="ltr"><span class="text-gray-500">موبایل:</span> {{ selectedOrder.customerPhone }}</p>
           <div>
@@ -198,6 +268,32 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
             class="mt-2"
           />
           <p v-if="selectedOrder.couponCode"><span class="text-gray-500">کد تخفیف:</span> {{ selectedOrder.couponCode }}</p>
+
+          <div
+            :class="[
+              'rounded-xl border p-3',
+              deliveryMethodOf(selectedOrder) === 'JET'
+                ? 'border-orange-200 bg-orange-50'
+                : 'border-green-100 bg-green-50/60',
+            ]"
+          >
+            <p class="text-xs text-gray-500 mb-0.5">نوع ارسال</p>
+            <p
+              :class="[
+                'font-bold',
+                deliveryMethodOf(selectedOrder) === 'JET' ? 'text-orange-700' : 'text-green-700',
+              ]"
+            >
+              {{ deliveryLabel(selectedOrder) }}
+            </p>
+            <p
+              v-if="selectedOrder.paymentDetails?.deliveryFee != null && Number(selectedOrder.paymentDetails.deliveryFee) > 0"
+              class="text-xs text-gray-600 mt-1"
+            >
+              هزینه ارسال: {{ formatPrice(Number(selectedOrder.paymentDetails.deliveryFee)) }}
+            </p>
+          </div>
+
           <p>
             <span class="text-gray-500">نوع پرداخت:</span>
             {{ paymentLabel(selectedOrder.paymentMethod) }}
@@ -205,21 +301,54 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
           <p v-if="selectedOrder.paymentMethod && selectedOrder.paymentMethod !== 'CASH_AT_DOOR'" class="text-xs text-amber-800 bg-amber-50 rounded-lg p-2">
             این گزینه را در سیستم فروشگاه ثبت کنید؛ پرداخت در سایت انجام نشده است.
           </p>
+
+          <div
+            v-if="paymentDetailRows(selectedOrder).length"
+            class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 space-y-2"
+          >
+            <p class="text-xs font-bold text-indigo-800">اطلاعات خرید قسطی / کیف پول</p>
+            <div
+              v-for="row in paymentDetailRows(selectedOrder)"
+              :key="row.label"
+              class="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+            >
+              <span class="text-gray-500">{{ row.label }}</span>
+              <span class="font-bold text-gray-900" dir="ltr">{{ row.value }}</span>
+            </div>
+          </div>
+
           <p v-if="selectedOrder.discountAmount">
             <span class="text-gray-500">تخفیف:</span> {{ formatPrice(selectedOrder.discountAmount) }}
           </p>
           <p class="font-bold text-base pt-2">{{ formatPrice(selectedOrder.totalPrice) }}</p>
         </div>
 
-        <div v-if="selectedOrder.items?.length" class="mt-4 border-t pt-4">
+        <div v-if="selectedOrder.items?.length" class="px-4 pb-4 border-t pt-4">
           <p class="text-sm font-medium mb-2">اقلام</p>
-          <div v-for="item in selectedOrder.items" :key="item.id" class="flex justify-between text-sm py-1">
-            <span>{{ item.name }} × {{ item.quantity }}</span>
-            <span>{{ formatPrice(item.subtotal || item.price * item.quantity) }}</span>
+          <div class="space-y-2">
+            <div
+              v-for="item in selectedOrder.items"
+              :key="item.id"
+              class="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-2"
+            >
+              <img
+                :src="getProductImage(item.product?.image ?? null)"
+                :alt="item.name"
+                class="h-14 w-14 shrink-0 rounded-lg object-cover bg-white border border-gray-100"
+                loading="lazy"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-gray-800 leading-snug">{{ item.name }}</p>
+                <p class="text-xs text-gray-500 mt-0.5">تعداد: {{ item.quantity }}</p>
+              </div>
+              <span class="shrink-0 text-sm font-bold text-gray-800">
+                {{ formatPrice(item.subtotal || item.price * item.quantity) }}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div v-if="nextStatuses(selectedOrder.status).length" class="mt-6 border-t pt-4">
+        <div v-if="nextStatuses(selectedOrder.status).length" class="px-4 pb-4 border-t pt-4">
           <AppAlertBanner :message="statusError" class="mb-3" />
 
           <label class="block text-sm font-medium mb-2">یادداشت برای مشتری (اختیاری)</label>
@@ -241,15 +370,17 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
           </p>
         </div>
 
-        <button
-          v-if="selectedOrder.status === 'PREPARING' || selectedOrder.status === 'SHIPPED'"
-          class="btn-secondary w-full text-sm mt-3"
-          @click="sendOrderSms(selectedOrder.id)"
-        >
-          ارسال دوباره پیامک وضعیت
-        </button>
+        <div class="px-4 pb-4">
+          <button
+            v-if="selectedOrder.status === 'PREPARING' || selectedOrder.status === 'SHIPPED'"
+            class="btn-secondary w-full text-sm"
+            @click="sendOrderSms(selectedOrder.id)"
+          >
+            ارسال دوباره پیامک وضعیت
+          </button>
+        </div>
 
-        <div v-if="selectedOrder.statusLogs?.length" class="mt-6 border-t pt-4">
+        <div v-if="selectedOrder.statusLogs?.length" class="px-4 pb-6 border-t pt-4">
           <p class="text-sm font-medium mb-2">تاریخچه</p>
           <div v-for="log in selectedOrder.statusLogs" :key="log.id" class="text-xs text-gray-500 py-1 border-b border-gray-50 last:border-0">
             {{ ORDER_STATUS_LABELS[log.status] }} — {{ formatShortDate(log.createdAt) }}

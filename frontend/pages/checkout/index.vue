@@ -25,12 +25,7 @@ const form = reactive({
   salaryCard: '',
   taraId: '',
   walletNote: '',
-  socialSecurityOtp: '',
 });
-
-const socialSecurityOtpSending = ref(false);
-const socialSecurityOtpSent = ref(false);
-const socialSecurityOtpDevCode = ref('');
 
 const showPaymentDetails = ref(false);
 const FREE_SHIPPING_MIN = 200_000;
@@ -62,7 +57,7 @@ const paymentOptions: { value: PaymentMethod; label: string; hint?: string; info
   {
     value: 'SOCIAL_SECURITY',
     label: PAYMENT_METHOD_LABELS.SOCIAL_SECURITY,
-    info: 'کد ملی بازنشسته و کد تأیید پیامکی را وارد کنید تا در سیستم فروشگاه ثبت شود.',
+    info: 'کد ملی بازنشسته را وارد کنید تا سفارش در سیستم فروشگاه ثبت شود.',
   },
   {
     value: 'TARA',
@@ -82,11 +77,6 @@ function selectPaymentMethod(method: PaymentMethod) {
   form.paymentMethod = method;
   if (method !== 'CASH_AT_DOOR') {
     showPaymentDetails.value = true;
-  }
-  if (method !== 'SOCIAL_SECURITY') {
-    form.socialSecurityOtp = '';
-    socialSecurityOtpSent.value = false;
-    socialSecurityOtpDevCode.value = '';
   }
 }
 
@@ -119,7 +109,6 @@ function buildPaymentDetails() {
   }
   if (form.paymentMethod === 'SOCIAL_SECURITY') {
     if (form.nationalId.trim()) details.nationalId = form.nationalId.trim();
-    if (form.socialSecurityOtp.trim()) details.otpCode = form.socialSecurityOtp.trim();
   }
   if (form.paymentMethod === 'TARA' && form.taraId.trim()) {
     details.taraId = form.taraId.trim();
@@ -140,16 +129,6 @@ function validateInstallmentDetails() {
   if (form.paymentMethod === 'SOCIAL_SECURITY') {
     if (!form.nationalId.trim()) {
       error.value = 'کد ملی را وارد کنید';
-      showPaymentDetails.value = true;
-      return false;
-    }
-    if (!/^09\d{9}$/.test(form.customerPhone.trim())) {
-      error.value = 'برای تأیید تامین اجتماعی، شماره موبایل معتبر وارد کنید';
-      showPaymentDetails.value = true;
-      return false;
-    }
-    if (!form.socialSecurityOtp.trim()) {
-      error.value = 'کد تأیید پیامکی را وارد کنید';
       showPaymentDetails.value = true;
       return false;
     }
@@ -210,29 +189,6 @@ function switchToAccount() {
   checkoutMode.value = 'account';
   if (!authStore.isLoggedIn) {
     navigateTo(`/auth/login?redirect=${encodeURIComponent('/checkout')}`);
-  }
-}
-
-async function sendSocialSecurityOtp() {
-  if (!/^09\d{9}$/.test(form.customerPhone.trim())) {
-    error.value = 'ابتدا شماره موبایل معتبر وارد کنید';
-    toast.error(error.value);
-    return;
-  }
-  socialSecurityOtpSending.value = true;
-  error.value = '';
-  try {
-    const { data } = await api.post<{ message: string; devCode?: string }>('/auth/send-otp', {
-      phone: form.customerPhone.trim(),
-    });
-    socialSecurityOtpSent.value = true;
-    socialSecurityOtpDevCode.value = data.devCode || '';
-    toast.success('کد تأیید ارسال شد');
-  } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'خطا در ارسال کد تأیید';
-    toast.error(error.value);
-  } finally {
-    socialSecurityOtpSending.value = false;
   }
 }
 
@@ -497,34 +453,6 @@ useHead({ title: 'ثبت سفارش - KIAA KALA' });
           <div v-if="form.paymentMethod === 'RETIREMENT_FUND'">
             <label class="block text-sm font-medium mb-1">شماره کارت حقوقی *</label>
             <input v-model="form.salaryCard" type="text" class="input-field min-h-[44px]" dir="ltr" />
-          </div>
-          <div v-if="form.paymentMethod === 'SOCIAL_SECURITY'" class="space-y-3 pt-1 border-t border-gray-100">
-            <p class="text-xs text-gray-500 leading-relaxed">
-              برای ثبت سفارش با تامین اجتماعی، کد تأیید به شماره موبایل شما ارسال می‌شود.
-            </p>
-            <button
-              type="button"
-              class="btn-secondary w-full min-h-[44px]"
-              :disabled="socialSecurityOtpSending"
-              @click="sendSocialSecurityOtp"
-            >
-              {{ socialSecurityOtpSending ? 'در حال ارسال...' : socialSecurityOtpSent ? 'ارسال مجدد کد' : 'ارسال کد تأیید' }}
-            </button>
-            <div>
-              <label class="block text-sm font-medium mb-1">کد تأیید پیامکی *</label>
-              <input
-                v-model="form.socialSecurityOtp"
-                type="text"
-                maxlength="6"
-                inputmode="numeric"
-                class="input-field min-h-[44px]"
-                dir="ltr"
-                placeholder="۶ رقم"
-              />
-            </div>
-            <p v-if="socialSecurityOtpDevCode" class="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              کد تست: {{ socialSecurityOtpDevCode }}
-            </p>
           </div>
           <div v-if="form.paymentMethod === 'TARA'">
             <label class="block text-sm font-medium mb-1">شناسه خرید تارا *</label>

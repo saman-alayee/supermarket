@@ -20,7 +20,7 @@ export interface RouteDrawOptions {
   showStepMarkers?: boolean;
 }
 
-const DEFAULT_ORIGIN = { lat: 37.4255, lng: 49.953 };
+const DEFAULT_ORIGIN = { lat: 37.419493, lng: 49.946101 };
 
 export async function fetchNeshanDirection(
   origin: { lat: number; lng: number },

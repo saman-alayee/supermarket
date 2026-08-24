@@ -1,10 +1,12 @@
 <script setup lang="ts">
 const { neshanMapsLink } = useGeocoding();
 
+const STORE_LAT = 37.419493;
+const STORE_LNG = 49.946101;
 const address = 'کیاشهر، خیابان امام، ساختمان دیلی مارکت';
 const phones = [
   { label: 'سفارش و پشتیبانی', value: '02191559543', href: 'tel:02191559543' },
-  { label: 'پشتیبانی', value: '02142820303', href: 'tel:02142820303' },
+  { label: 'پشتیبانی', value: '01342820303', href: 'tel:01342820303' },
 ];
 
 useHead({ title: 'تماس با ما - KIAA KALA' });
@@ -22,7 +24,7 @@ useHead({ title: 'تماس با ما - KIAA KALA' });
         <p class="text-xs text-gray-500 mb-1">آدرس فروشگاه</p>
         <p class="text-sm font-medium text-gray-800 leading-relaxed">{{ address }}</p>
         <a
-          :href="neshanMapsLink(37.4255, 49.953)"
+          :href="neshanMapsLink(STORE_LAT, STORE_LNG)"
           target="_blank"
           rel="noopener"
           class="inline-flex items-center gap-1 text-xs text-primary-600 mt-2 font-medium"
@@ -31,8 +33,8 @@ useHead({ title: 'تماس با ما - KIAA KALA' });
           مشاهده روی نقشه نشان
         </a>
         <AppMapPicker
-          :latitude="37.4255"
-          :longitude="49.953"
+          :latitude="STORE_LAT"
+          :longitude="STORE_LNG"
           readonly
           height="200px"
           :zoom="16"

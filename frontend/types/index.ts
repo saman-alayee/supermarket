@@ -154,7 +154,16 @@ export interface Order {
   totalPrice: number;
   status: OrderStatus;
   paymentMethod?: PaymentMethod;
-  paymentDetails?: Record<string, string> | null;
+  paymentDetails?: {
+    deliveryMethod?: 'FREE' | 'JET' | string;
+    deliveryFee?: number | string;
+    nationalId?: string;
+    salaryCard?: string;
+    taraId?: string;
+    walletNote?: string;
+    otpVerified?: boolean | string;
+    [key: string]: unknown;
+  } | null;
   customerName: string;
   customerPhone?: string;
   deliveryAddress?: string;

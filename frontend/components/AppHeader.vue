@@ -22,7 +22,7 @@ function handleSearch() {
           <AppIcon name="lucide:search" size="lg" />
         </button>
 
-        <AppLogo size="lg" />
+        <AppLogo size="lg" link />
 
         <div class="hidden md:flex flex-1 max-w-xl mx-8">
           <form class="w-full relative" @submit.prevent="handleSearch">

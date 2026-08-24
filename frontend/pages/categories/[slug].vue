@@ -332,7 +332,7 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - KIAA KALA` 
 
           <span class="text-base">🛒</span>
 
-          همه برچسب‌ها
+          همه محصولات
 
         </button>
 

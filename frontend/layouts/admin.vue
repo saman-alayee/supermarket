@@ -28,7 +28,7 @@ watch(() => route.path, () => {
     <aside class="fixed top-0 start-0 h-full w-64 bg-white border-e border-gray-200 z-40 hidden lg:flex lg:flex-col">
       <div class="p-6 border-b border-gray-100">
         <NuxtLink to="/admin">
-          <AppLogo size="sm" />
+          <AppLogo size="sm" :link="false" />
         </NuxtLink>
         <p class="text-xs text-gray-400 mt-1">پنل مدیریت حرفه‌ای</p>
       </div>
@@ -56,7 +56,7 @@ watch(() => route.path, () => {
       <div class="absolute inset-0 bg-black/40" @click="mobileNavOpen = false" />
       <aside class="absolute top-0 start-0 h-full w-72 bg-white shadow-xl flex flex-col">
         <div class="p-4 border-b flex items-center justify-between">
-          <AppLogo size="sm" />
+          <AppLogo size="sm" :link="false" />
           <button class="p-2 rounded-lg hover:bg-gray-100 text-gray-500" @click="mobileNavOpen = false">
             <AppIcon name="lucide:x" size="lg" />
           </button>

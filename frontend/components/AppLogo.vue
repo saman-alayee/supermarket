@@ -18,12 +18,25 @@ const sizeClass = {
 </script>
 
 <template>
-  <component :is="link ? 'NuxtLink' : 'div'" :to="link ? '/' : undefined" class="inline-flex items-center shrink-0">
+  <NuxtLink
+    v-if="link"
+    to="/"
+    class="inline-flex items-center shrink-0 relative z-10 cursor-pointer"
+    aria-label="صفحه اصلی KIAA KALA"
+  >
     <img
       src="/logo.png"
       alt="KIAA KALA"
       :class="[sizeClass[size], 'w-auto object-contain drop-shadow-sm scale-110']"
       style="filter: contrast(1.08) saturate(1.1);"
     />
-  </component>
+  </NuxtLink>
+  <div v-else class="inline-flex items-center shrink-0">
+    <img
+      src="/logo.png"
+      alt="KIAA KALA"
+      :class="[sizeClass[size], 'w-auto object-contain drop-shadow-sm scale-110']"
+      style="filter: contrast(1.08) saturate(1.1);"
+    />
+  </div>
 </template>
