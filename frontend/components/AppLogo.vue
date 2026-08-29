@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 withDefaults(
   defineProps<{
     size?: 'sm' | 'md' | 'lg';
@@ -22,21 +24,19 @@ const sizeClass = {
     v-if="link"
     to="/"
     class="inline-flex items-center shrink-0 relative z-10 cursor-pointer"
-    aria-label="صفحه اصلی KIAA KALA"
+    :aria-label="`صفحه اصلی ${SITE_NAME}`"
   >
     <img
       src="/logo.png"
-      alt="KIAA KALA"
-      :class="[sizeClass[size], 'w-auto object-contain drop-shadow-sm scale-110']"
-      style="filter: contrast(1.08) saturate(1.1);"
+      :alt="SITE_NAME"
+      :class="[sizeClass[size], 'w-auto object-contain']"
     />
   </NuxtLink>
   <div v-else class="inline-flex items-center shrink-0">
     <img
       src="/logo.png"
-      alt="KIAA KALA"
-      :class="[sizeClass[size], 'w-auto object-contain drop-shadow-sm scale-110']"
-      style="filter: contrast(1.08) saturate(1.1);"
+      :alt="SITE_NAME"
+      :class="[sizeClass[size], 'w-auto object-contain']"
     />
   </div>
 </template>

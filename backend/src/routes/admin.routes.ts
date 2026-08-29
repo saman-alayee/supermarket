@@ -569,6 +569,7 @@ const sliderSchema = z.object({
   linkUrl: z.string().optional().nullable(),
   sortOrder: z.number().optional(),
   placement: z.enum(['HOME_TOP', 'HOME_MID']).optional(),
+  categoryId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -805,6 +806,24 @@ router.put(
   asyncHandler(async (req, res) => {
     const settings = await settingsService.updateNewOrderSms(req.body);
     successResponse(res, settings, 'تنظیمات پیامک ذخیره شد');
+  })
+);
+
+const newOrderSmsTestSchema = z.object({
+  phone: z.string().min(10).max(15),
+  messageTemplate: z.string().min(5).max(500).optional(),
+});
+
+router.post(
+  '/settings/new-order-sms/test',
+  permSettings,
+  validate(newOrderSmsTestSchema),
+  asyncHandler(async (req, res) => {
+    const result = await settingsService.sendNewOrderSmsTest(req.body);
+    const message = result.stub
+      ? 'پیامک تست در حالت توسعه شبیه‌سازی شد (FarazSMS پیکربندی نشده)'
+      : 'پیامک تست ارسال شد';
+    successResponse(res, result, message);
   })
 );
 

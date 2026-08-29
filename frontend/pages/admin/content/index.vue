@@ -6,7 +6,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' });
 const api = useApi();
 const toast = useToast();
 
-const DEFAULT_TERMS = `# قوانین و مقررات کیاکالا
+const DEFAULT_TERMS = `# قوانین و مقررات Jetkala
 
 ## ۱. ثبت سفارش
 - ثبت سفارش به منزله پذیرش قیمت‌ها و شرایط فروشگاه است.

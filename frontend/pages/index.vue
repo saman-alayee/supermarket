@@ -52,6 +52,10 @@ const activeDealProducts = computed(() => {
 
 const visibleCategorySections = computed(() => categorySections.value);
 
+function midSlidersAfterCategory(categoryId: string) {
+  return (midSliders.value ?? []).filter((slider) => slider.categoryId === categoryId);
+}
+
 const activeDealLink = computed(() =>
   dealTab.value === 'discounted' || !featuredProducts.value.length
     ? '/search?discounted=1'
@@ -117,7 +121,7 @@ watch(
   { immediate: true }
 );
 
-useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
+useHead({ title: 'Jetkala - فروشگاه اینترنتی' });
 </script>
 
 <template>
@@ -238,8 +242,8 @@ useHead({ title: 'KIAA KALA - فروشگاه اینترنتی' });
       </section>
 
       <PromoSlider
-        v-if="midSliders?.length && index === 1 && index < visibleCategorySections.length - 1"
-        :sliders="midSliders"
+        v-if="midSlidersAfterCategory(section.category.id).length"
+        :sliders="midSlidersAfterCategory(section.category.id)"
         variant="carousel"
         height-class="h-[100px] sm:h-[120px] md:h-[140px]"
         compact

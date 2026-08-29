@@ -9,7 +9,7 @@ const phones = [
   { label: 'پشتیبانی', value: '01342820303', href: 'tel:01342820303' },
 ];
 
-useHead({ title: 'تماس با ما - KIAA KALA' });
+useHead({ title: 'تماس با ما - Jetkala' });
 </script>
 
 <template>

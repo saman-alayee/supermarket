@@ -133,7 +133,7 @@ const hasFormErrors = computed(() =>
   Boolean(errors.street || errors.plaque || errors.unit || errors.map)
 );
 
-useHead({ title: 'آدرس‌ها - KIAA KALA' });
+useHead({ title: 'آدرس‌ها - Jetkala' });
 </script>
 
 <template>

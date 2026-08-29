@@ -53,7 +53,7 @@ onMounted(() => {
             <AppIcon name="lucide:smartphone" size="lg" class="text-primary-600" />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-bold text-gray-800">نصب اپلیکیشن KIAA KALA</p>
+            <p class="text-sm font-bold text-gray-800">نصب اپلیکیشن Jetkala</p>
             <p class="text-xs text-gray-500 mt-1 leading-relaxed">
               برای دسترسی سریع‌تر، اپ را روی صفحه اصلی گوشی خود نصب کنید.
             </p>

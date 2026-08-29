@@ -334,7 +334,8 @@ export class OrderService {
     dateFrom?: string;
     dateTo?: string;
   }) {
-    const { status, paymentMethod, page = 1, limit = 20, search, dateFrom, dateTo } = filters;
+    const { status, paymentMethod, page = 1, limit: rawLimit = 20, search, dateFrom, dateTo } = filters;
+    const limit = Math.min(Math.max(rawLimit, 1), 100);
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (paymentMethod) where.paymentMethod = paymentMethod;

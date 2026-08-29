@@ -8,7 +8,7 @@ const props = withDefaults(
 
 const cartStore = useCartStore();
 const { formatPriceCompact, getProductImage } = useFormat();
-const { isFavorite, toggleFavorite, fetchFavorites } = useFavorites();
+const { isFavorite, toggleFavorite } = useFavorites();
 
 const isCompact = computed(() => props.size === 'compact');
 const quantity = computed(() => cartStore.getItemQuantity(props.product.id));
@@ -19,10 +19,6 @@ const favLoading = ref(false);
 const heartIconClass = computed(() =>
   favorited.value ? 'text-red-500 fill-red-500 stroke-red-500' : 'text-gray-500 fill-none stroke-current'
 );
-
-onMounted(() => {
-  fetchFavorites();
-});
 
 async function handleFavorite(event: Event) {
   event.preventDefault();
@@ -92,8 +88,11 @@ async function handleDecrease(event: Event) {
       </div>
 
       <div
-        v-if="product.isNew && !isCompact"
-        class="absolute top-0 end-0 z-10 rounded-es-xl bg-accent-500 px-2 py-1 text-[10px] font-bold text-white"
+        v-if="product.isNew"
+        :class="[
+          'absolute top-0 end-0 z-10 font-bold text-white bg-accent-500',
+          isCompact ? 'rounded-es-lg px-1.5 py-0.5 text-[9px]' : 'rounded-es-xl px-2 py-1 text-[10px]',
+        ]"
       >
         جدید
       </div>
@@ -101,8 +100,10 @@ async function handleDecrease(event: Event) {
       <button
         type="button"
         :class="[
-          'absolute z-20 flex items-center justify-center rounded-full shadow-sm transition-all',
-          isCompact ? 'top-1.5 end-1.5 h-6 w-6 bg-white/95' : 'top-2 end-2 h-8 w-8 bg-white/95 hover:bg-white',
+          'absolute z-20 flex items-center justify-center rounded-full shadow-sm transition-all bg-white/95',
+          isCompact
+            ? 'bottom-1.5 start-1.5 h-6 w-6'
+            : 'bottom-2 end-2 h-8 w-8 hover:bg-white',
           favorited ? 'ring-1 ring-red-100' : '',
         ]"
         :disabled="favLoading"

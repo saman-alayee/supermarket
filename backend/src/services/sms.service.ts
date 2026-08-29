@@ -1,4 +1,5 @@
 import { config } from '../config';
+import { SITE_NAME } from '../config/site';
 import { AppError } from '../utils/errors';
 
 const FARAZSMS_PATTERN_URL = 'https://api.iranpayamak.com/ws/v1/sms/pattern';
@@ -159,7 +160,7 @@ export class SmsService {
 
     await this.sendSimpleText(
       formatted,
-      `سفارش ${orderNumber} آماده تحویل به پیک شد.\nKIAA KALA`
+      `سفارش ${orderNumber} آماده تحویل به پیک شد.\n${SITE_NAME}`
     );
   }
 

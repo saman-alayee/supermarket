@@ -15,7 +15,7 @@ export const PANEL_PERMISSIONS = [
 
 export type PanelPermission = (typeof PANEL_PERMISSIONS)[number];
 
-export const PERMISSION_PATHS: Array<{ prefix: string; permission: PanelPermission }> = [
+const PERMISSION_PATH_ENTRIES: Array<{ prefix: string; permission: PanelPermission }> = [
   { prefix: '/admin/users', permission: 'users' },
   { prefix: '/admin/settings', permission: 'settings' },
   { prefix: '/admin/sales', permission: 'sales' },
@@ -28,7 +28,11 @@ export const PERMISSION_PATHS: Array<{ prefix: string; permission: PanelPermissi
   { prefix: '/admin/products', permission: 'products' },
   { prefix: '/admin/orders', permission: 'orders' },
   { prefix: '/admin', permission: 'dashboard' },
-].sort((a, b) => b.prefix.length - a.prefix.length);
+];
+
+export const PERMISSION_PATHS = PERMISSION_PATH_ENTRIES.sort(
+  (a, b) => b.prefix.length - a.prefix.length
+);
 
 export const BUILTIN_ROLE_PERMISSIONS: Record<string, PanelPermission[]> = {
   ADMIN: [...PANEL_PERMISSIONS],

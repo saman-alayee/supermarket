@@ -37,7 +37,7 @@ async function loadOrders() {
   }
 }
 
-useHead({ title: 'سفارش‌های من - KIAA KALA' });
+useHead({ title: 'سفارش‌های من - Jetkala' });
 </script>
 
 <template>

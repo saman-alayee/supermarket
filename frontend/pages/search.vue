@@ -104,7 +104,7 @@ watch(
 );
 
 useHead(() => ({
-  title: `${pageTitle.value} - KIAA KALA`,
+  title: `${pageTitle.value} - Jetkala`,
 }));
 </script>
 

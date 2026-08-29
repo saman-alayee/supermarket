@@ -128,6 +128,7 @@ model Category {
 
   products Product[]
   tags     Tag[]
+  sliders  Slider[]
 
   @@map("categories")
 }
@@ -281,17 +282,22 @@ model OrderStatusLog {
 }
 
 model Slider {
-  id        String          @id @default(cuid())
-  title     String
-  image     String
-  linkUrl   String?
-  sortOrder Int             @default(0)
-  placement SliderPlacement @default(HOME_TOP)
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id         String          @id @default(cuid())
+  title      String
+  image      String
+  linkUrl    String?
+  sortOrder  Int             @default(0)
+  placement  SliderPlacement @default(HOME_TOP)
+  /** For HOME_MID: show banner after this category section on the homepage */
+  categoryId String?
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([placement, isActive, sortOrder])
+  @@index([categoryId])
   @@map("sliders")
 }
 
@@ -370,6 +376,8 @@ model Order {
   @@index([status])
   @@index([customerPhone])
   @@index([paymentMethod])
+  @@index([createdAt])
+  @@index([status, createdAt])
   @@map("orders")
 }
 

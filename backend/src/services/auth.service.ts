@@ -70,7 +70,12 @@ export class AuthService {
   /** Customer (or any user with personal password) login */
   async loginWithPassword(phone: string, password: string, options?: { requireAdmin?: boolean }) {
     const normalizedPhone = this.normalizePhone(phone);
-    const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    let user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+
+    // Bootstrap listed admin phones (same as OTP login) so password login works after DB reset
+    if (!user && config.adminPhones.includes(normalizedPhone)) {
+      user = await this.findOrCreateUser(normalizedPhone);
+    }
 
     if (!user || !user.isActive) {
       throw new AppError(401, 'شماره موبایل یا رمز عبور اشتباه است');

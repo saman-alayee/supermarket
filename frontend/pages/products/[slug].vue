@@ -5,7 +5,7 @@ const route = useRoute();
 const api = useApi();
 const cartStore = useCartStore();
 const { formatPrice, getProductImage, resolveMediaUrl } = useFormat();
-const { isFavorite, toggleFavorite, fetchFavorites } = useFavorites();
+const { isFavorite, toggleFavorite } = useFavorites();
 
 const slug = route.params.slug as string;
 
@@ -51,13 +51,12 @@ async function loadRelated() {
 }
 
 onMounted(async () => {
-  await fetchFavorites();
   await loadRelated();
 });
 
 watch(product, loadRelated);
 
-useHead({ title: `${product.value?.name || 'محصول'} - KIAA KALA` });
+useHead({ title: `${product.value?.name || 'محصول'} - Jetkala` });
 </script>
 
 <template>

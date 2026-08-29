@@ -2,7 +2,7 @@
 const route = useRoute();
 const orderNumber = route.query.number as string;
 
-useHead({ title: 'سفارش ثبت شد - KIAA KALA' });
+useHead({ title: 'سفارش ثبت شد - Jetkala' });
 </script>
 
 <template>

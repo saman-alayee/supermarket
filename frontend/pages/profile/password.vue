@@ -111,7 +111,7 @@ async function submit() {
   }
 }
 
-useHead({ title: 'رمز عبور - KIAA KALA' });
+useHead({ title: 'رمز عبور - Jetkala' });
 </script>
 
 <template>

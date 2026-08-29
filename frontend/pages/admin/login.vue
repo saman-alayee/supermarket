@@ -68,7 +68,7 @@ function switchMode(next: 'password' | 'otp') {
   password.value = '';
 }
 
-useHead({ title: 'ورود ادمین - KIAA KALA' });
+useHead({ title: 'ورود ادمین - Jetkala' });
 definePageMeta({ layout: false });
 </script>
 

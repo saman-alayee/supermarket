@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { Prisma } from '@prisma/client';
 import { cacheGet, cacheSet, cacheDel } from '../config/redis';
 import { AppError } from '../utils/errors';
 import { slugify } from '../utils/helpers';
@@ -275,15 +276,47 @@ export class ProductService {
       orderBy: { sortOrder: 'asc' },
     });
 
-    const feed = await Promise.all(
-      categories.map(async (category) => {
-        const products = await prisma.product.findMany({
-          where: { categoryId: category.id, isActive: true },
-          include: productInclude,
-          take: 10,
-          orderBy: { createdAt: 'desc' },
-        });
+    const categoryIds = categories.map((category) => category.id);
+    if (categoryIds.length === 0) {
+      await cacheSet(cacheKey, [], 300);
+      return [];
+    }
 
+    const rankedRows = await prisma.$queryRaw<Array<{ id: string; categoryId: string }>>(Prisma.sql`
+      SELECT id, categoryId FROM (
+        SELECT id, categoryId,
+          ROW_NUMBER() OVER (PARTITION BY categoryId ORDER BY createdAt DESC) AS rn
+        FROM products
+        WHERE isActive = true AND categoryId IN (${Prisma.join(categoryIds)})
+      ) ranked
+      WHERE rn <= 10
+    `);
+
+    const productIds = rankedRows.map((row) => row.id);
+    if (productIds.length === 0) {
+      await cacheSet(cacheKey, [], 300);
+      return [];
+    }
+
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: productInclude,
+    });
+
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const productsByCategory = new Map<string, ReturnType<typeof this.formatProduct>[]>();
+
+    for (const row of rankedRows) {
+      const product = productById.get(row.id);
+      if (!product) continue;
+      const list = productsByCategory.get(row.categoryId) ?? [];
+      list.push(this.formatProduct(product));
+      productsByCategory.set(row.categoryId, list);
+    }
+
+    const feed = categories
+      .map((category) => {
+        const formatted = productsByCategory.get(category.id) ?? [];
         return {
           category: {
             id: category.id,
@@ -291,14 +324,13 @@ export class ProductService {
             slug: category.slug,
             image: category.image,
           },
-          products: this.sortByDiscountPercent(products.map((p) => this.formatProduct(p))),
+          products: this.sortByDiscountPercent(formatted),
         };
       })
-    );
+      .filter((section) => section.products.length > 0);
 
-    const result = feed.filter((section) => section.products.length > 0);
-    await cacheSet(cacheKey, result, 300);
-    return result;
+    await cacheSet(cacheKey, feed, 300);
+    return feed;
   }
 
   async getCategoryGroupedByTags(categorySlug: string) {

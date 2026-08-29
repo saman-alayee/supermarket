@@ -31,7 +31,7 @@ async function copyOrderNumber() {
   }
 }
 
-useHead({ title: 'جزئیات سفارش - KIAA KALA' });
+useHead({ title: 'جزئیات سفارش - Jetkala' });
 </script>
 
 <template>

@@ -1,3 +1,5 @@
+import { SITE_NAME } from './constants/site';
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   devtools: { enabled: process.env.NODE_ENV !== 'production' },
@@ -27,11 +29,11 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'fa', dir: 'rtl' },
-      title: 'KIAA KALA',
+      title: SITE_NAME,
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no' },
-        { name: 'description', content: 'فروشگاه اینترنتی KIAA KALA - خرید آنلاین و ارسال به درب منزل' },
+        { name: 'description', content: `فروشگاه اینترنتی ${SITE_NAME} - خرید آنلاین و ارسال به درب منزل` },
         { name: 'theme-color', content: '#16a34a' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
@@ -45,16 +47,6 @@ export default defineNuxtConfig({
       link: [
         { rel: 'icon', type: 'image/png', href: '/logo.png' },
         { rel: 'apple-touch-icon', href: '/pwa-192.png' },
-        {
-          rel: 'stylesheet',
-          href: 'https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.css',
-        },
-      ],
-      script: [
-        {
-          src: 'https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.js',
-          defer: true,
-        },
       ],
     },
   },
@@ -94,9 +86,9 @@ export default defineNuxtConfig({
     registerType: 'autoUpdate',
     manifest: {
       id: '/',
-      name: 'KIAA KALA',
-      short_name: 'KIAA KALA',
-      description: 'فروشگاه اینترنتی KIAA KALA',
+      name: SITE_NAME,
+      short_name: SITE_NAME,
+      description: `فروشگاه اینترنتی ${SITE_NAME}`,
       theme_color: '#16a34a',
       background_color: '#ffffff',
       display: 'standalone',

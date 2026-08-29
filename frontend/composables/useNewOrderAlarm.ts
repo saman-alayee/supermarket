@@ -78,7 +78,7 @@ export function useNewOrderAlarm() {
     if (!import.meta.client || typeof Notification === 'undefined') return;
     if (Notification.permission !== 'granted') return;
     try {
-      const n = new Notification('سفارش جدید — KIAA KALA', {
+      const n = new Notification('سفارش جدید — Jetkala', {
         body: `شماره سفارش: ${orderNumber}`,
         tag: `order-${orderNumber}`,
         dir: 'rtl',

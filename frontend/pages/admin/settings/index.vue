@@ -20,7 +20,9 @@ const tabs: Array<{ id: SettingsTab; label: string; icon: string }> = [
 const activeTab = ref<SettingsTab>('new-order-sms');
 const loading = ref(true);
 const saving = ref(false);
+const testing = ref(false);
 const showGuide = ref(true);
+const testPhone = ref('');
 
 const form = reactive({
   enabled: true,
@@ -54,6 +56,9 @@ async function loadSettings() {
     form.phonesText = data.phones.join('\n');
     form.includePanelStaff = data.includePanelStaff;
     form.messageTemplate = data.messageTemplate;
+    if (!testPhone.value && data.phones.length) {
+      testPhone.value = data.phones[0];
+    }
   } catch (e: unknown) {
     toast.error(e instanceof Error ? e.message : 'خطا در بارگذاری تنظیمات');
   } finally {
@@ -70,6 +75,35 @@ function parsePhones(text: string): string[] {
 
 function insertPlaceholder(key: '{orderNumber}' | '{customerName}') {
   form.messageTemplate = `${form.messageTemplate}${form.messageTemplate ? ' ' : ''}${key}`;
+}
+
+async function sendTestSms() {
+  const phone = testPhone.value.trim();
+  if (!phone) {
+    toast.error('شماره موبایل برای تست وارد کنید');
+    return;
+  }
+  if (!form.messageTemplate.trim()) {
+    toast.error('متن پیامک خالی است');
+    return;
+  }
+
+  testing.value = true;
+  try {
+    const res = await api.post<{ phone: string; preview: string; stub: boolean }>(
+      '/admin/settings/new-order-sms/test',
+      {
+        phone,
+        messageTemplate: form.messageTemplate.trim(),
+      }
+    );
+    const msg = res.message || 'پیامک تست ارسال شد';
+    toast.success(res.data.stub ? `${msg} — ${res.data.preview}` : msg);
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ارسال پیامک تست');
+  } finally {
+    testing.value = false;
+  }
 }
 
 async function saveSettings() {
@@ -266,6 +300,35 @@ useHead({ title: 'تنظیمات - پنل مدیریت' });
         class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800"
       >
         هنوز گیرنده‌ای ندارید. حداقل یک شماره وارد کنید یا «ارسال به همه پرسنل پنل» را روشن کنید.
+      </div>
+
+      <div class="rounded-lg border border-dashed border-gray-200 p-4 space-y-3">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">ارسال پیامک تست</h3>
+          <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+            قبل از ذخیره هم می‌توانید با متن فعلی فرم، یک پیامک آزمایشی بفرستید. پیشوند
+            <span dir="ltr" class="font-mono">[تست]</span>
+            به ابتدای پیام اضافه می‌شود.
+          </p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">شماره گیرنده تست</label>
+          <input
+            v-model="testPhone"
+            type="tel"
+            dir="ltr"
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono text-start focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="09121234567"
+          />
+        </div>
+        <button
+          type="button"
+          class="btn-secondary text-sm disabled:opacity-60"
+          :disabled="testing || !testPhone.trim()"
+          @click="sendTestSms"
+        >
+          {{ testing ? 'در حال ارسال…' : 'ارسال پیامک تست' }}
+        </button>
       </div>
 
       <div class="flex justify-end pt-2">

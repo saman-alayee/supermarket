@@ -36,7 +36,7 @@ watch(
   loadSuggestions
 );
 
-useHead({ title: 'سبد خرید - KIAA KALA' });
+useHead({ title: 'سبد خرید - Jetkala' });
 </script>
 
 <template>

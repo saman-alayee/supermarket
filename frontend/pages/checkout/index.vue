@@ -286,7 +286,7 @@ async function submitOrder() {
   }
 }
 
-useHead({ title: 'ثبت سفارش - KIAA KALA' });
+useHead({ title: 'ثبت سفارش - Jetkala' });
 </script>
 
 <template>

@@ -45,7 +45,7 @@ async function save() {
   }
 }
 
-useHead({ title: 'تنظیمات حساب - KIAA KALA' });
+useHead({ title: 'تنظیمات حساب - Jetkala' });
 </script>
 
 <template>

@@ -33,7 +33,7 @@ onMounted(() => {
   loadProducts();
 });
 
-useHead({ title: 'دسته‌بندی‌ها - KIAA KALA' });
+useHead({ title: 'دسته‌بندی‌ها - Jetkala' });
 </script>
 
 <template>

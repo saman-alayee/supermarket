@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 const { formatJalaliYear } = useFormat();
 
 const links = [
@@ -20,7 +22,7 @@ const links = [
           </NuxtLink>
         </nav>
       </div>
-      <p class="text-xs text-gray-400 mt-4">© {{ formatJalaliYear() }} KIAA KALA — فروشگاه آنلاین</p>
+      <p class="text-xs text-gray-400 mt-4">© {{ formatJalaliYear() }} {{ SITE_NAME }} — فروشگاه آنلاین</p>
     </div>
   </footer>
 </template>

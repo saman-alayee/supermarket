@@ -215,7 +215,7 @@ watch(slug, () => {
 
 onMounted(loadPageData);
 
-useHead({ title: `${category.value?.name || 'دسته‌بندی'} - KIAA KALA` });
+useHead({ title: `${category.value?.name || 'دسته‌بندی'} - Jetkala` });
 </script>
 
 <template>

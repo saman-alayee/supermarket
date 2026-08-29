@@ -21,6 +21,8 @@ function writeLocalIds(ids: Set<string>) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify([...ids]));
 }
 
+let inflight: Promise<Product[]> | null = null;
+
 export function useFavorites() {
   const authStore = useAuthStore();
   const api = useApi();
@@ -38,27 +40,42 @@ export function useFavorites() {
     return data.products;
   }
 
-  async function fetchFavorites() {
-    favoritesLoading.value = true;
-    try {
-      if (!authStore.isLoggedIn) {
-        const ids = readLocalIds();
-        favoriteIds.value = new Set(ids);
-        favoritesLoaded.value = true;
-        return fetchFavoriteProducts(ids);
-      }
+  async function fetchFavorites(force = false): Promise<Product[]> {
+    if (inflight && !force) return inflight;
 
+    if (!force && favoritesLoaded.value) {
+      if (!authStore.isLoggedIn) {
+        return fetchFavoriteProducts([...favoriteIds.value]);
+      }
       const { data } = await api.get<Product[]>('/favorites');
-      favoriteIds.value = new Set(data.map((item) => item.id));
-      favoritesLoaded.value = true;
       return data;
-    } catch {
-      favoriteIds.value = new Set();
-      favoritesLoaded.value = true;
-      return [] as Product[];
-    } finally {
-      favoritesLoading.value = false;
     }
+
+    inflight = (async () => {
+      favoritesLoading.value = true;
+      try {
+        if (!authStore.isLoggedIn) {
+          const ids = readLocalIds();
+          favoriteIds.value = new Set(ids);
+          favoritesLoaded.value = true;
+          return fetchFavoriteProducts(ids);
+        }
+
+        const { data } = await api.get<Product[]>('/favorites');
+        favoriteIds.value = new Set(data.map((item) => item.id));
+        favoritesLoaded.value = true;
+        return data;
+      } catch {
+        favoriteIds.value = new Set();
+        favoritesLoaded.value = true;
+        return [] as Product[];
+      } finally {
+        favoritesLoading.value = false;
+        inflight = null;
+      }
+    })();
+
+    return inflight;
   }
 
   async function addFavorite(productId: string) {
@@ -126,7 +143,7 @@ export function useFavorites() {
             // keep local until next login
           }
         }
-        await fetchFavorites();
+        await fetchFavorites(true);
       } else {
         favoriteIds.value = new Set(readLocalIds());
         favoritesLoaded.value = true;

@@ -3,15 +3,26 @@ import { AppError } from '../utils/errors';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CartService {
+  private async resolveUserId(userId?: string): Promise<string | undefined> {
+    if (!userId) return undefined;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    return user ? userId : undefined;
+  }
+
   private async getOrCreateCart(userId?: string, sessionId?: string) {
-    if (userId) {
+    const validUserId = await this.resolveUserId(userId);
+
+    if (validUserId) {
       let cart = await prisma.cart.findUnique({
-        where: { userId },
+        where: { userId: validUserId },
         include: { items: { include: { product: true } } },
       });
       if (!cart) {
         cart = await prisma.cart.create({
-          data: { userId },
+          data: { userId: validUserId },
           include: { items: { include: { product: true } } },
         });
       }

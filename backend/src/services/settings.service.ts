@@ -1,12 +1,14 @@
 import prisma from '../config/database';
+import { Prisma } from '@prisma/client';
 import { config } from '../config';
+import { SITE_NAME } from '../config/site';
 import { AppError } from '../utils/errors';
 import { normalizePhone } from '../utils/normalize';
 
 export const NEW_ORDER_SMS_KEY = 'new_order_sms';
 
 export const DEFAULT_NEW_ORDER_SMS_TEMPLATE =
-  'سفارش جدید {orderNumber}\nمشتری: {customerName}\nKIAA KALA';
+  `سفارش جدید {orderNumber}\nمشتری: {customerName}\n${SITE_NAME}`;
 
 export interface NewOrderSmsSettings {
   /** When false, no operator SMS is sent on new orders. */
@@ -100,8 +102,8 @@ export class SettingsService {
 
     await prisma.appSetting.upsert({
       where: { key: NEW_ORDER_SMS_KEY },
-      create: { key: NEW_ORDER_SMS_KEY, value: next },
-      update: { value: next },
+      create: { key: NEW_ORDER_SMS_KEY, value: next as unknown as Prisma.InputJsonValue },
+      update: { value: next as unknown as Prisma.InputJsonValue },
     });
 
     return next;
@@ -135,6 +137,36 @@ export class SettingsService {
       phones: [...new Set(phones)],
       messageTemplate: settings.messageTemplate,
     };
+  }
+
+  async sendNewOrderSmsTest(input: {
+    phone: string;
+    messageTemplate?: string;
+  }): Promise<{ phone: string; preview: string; stub: boolean }> {
+    let phone: string;
+    try {
+      phone = normalizePhone(String(input.phone).trim());
+    } catch {
+      throw new AppError(400, 'شماره موبایل نامعتبر است');
+    }
+
+    const settings = await this.getNewOrderSms();
+    const template =
+      typeof input.messageTemplate === 'string' && input.messageTemplate.trim()
+        ? input.messageTemplate.trim()
+        : settings.messageTemplate;
+
+    const preview = `[تست] ${template
+      .split('{orderNumber}')
+      .join('KK-TEST-001')
+      .split('{customerName}')
+      .join('مشتری تست')}`;
+
+    const { smsService } = await import('./sms.service');
+    const stub = !smsService.isConfigured();
+    await smsService.broadcast([phone], preview);
+
+    return { phone, preview, stub };
   }
 }
 

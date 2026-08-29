@@ -11,6 +11,8 @@ const { formatPrice, formatShortDate, getProductImage } = useFormat();
 const { mapsLink } = useGeocoding();
 
 const orders = ref<Order[]>([]);
+const pagination = ref<Pagination | null>(null);
+const page = ref(1);
 const loading = ref(true);
 const search = ref('');
 const statusFilter = ref((route.query.status as OrderStatus) || '');
@@ -76,15 +78,31 @@ async function loadOrders() {
   loading.value = true;
   try {
     const params = new URLSearchParams();
+    params.set('page', String(page.value));
+    params.set('limit', '20');
     if (statusFilter.value) params.set('status', statusFilter.value);
     if (search.value) params.set('search', search.value);
     if (dateFrom.value) params.set('dateFrom', dateFrom.value);
     if (dateTo.value) params.set('dateTo', dateTo.value);
     const { data } = await api.get<{ orders: Order[]; pagination: Pagination }>(`/admin/orders?${params}`);
     orders.value = data.orders;
+    pagination.value = data.pagination;
+    if (
+      pagination.value &&
+      pagination.value.totalPages > 0 &&
+      page.value > pagination.value.totalPages
+    ) {
+      page.value = pagination.value.totalPages;
+      await loadOrders();
+    }
   } finally {
     loading.value = false;
   }
+}
+
+function goToPage(next: number) {
+  page.value = next;
+  void loadOrders();
 }
 
 async function openOrder(orderId: string) {
@@ -135,8 +153,19 @@ function nextStatuses(status: OrderStatus) {
   return NEXT_STATUS[status] || [];
 }
 
-watch(statusFilter, loadOrders);
-watch([dateFrom, dateTo], loadOrders);
+function searchOrders() {
+  page.value = 1;
+  void loadOrders();
+}
+
+watch(statusFilter, () => {
+  page.value = 1;
+  void loadOrders();
+});
+watch([dateFrom, dateTo], () => {
+  page.value = 1;
+  void loadOrders();
+});
 
 useHead({ title: 'سفارش‌ها - پنل مدیریت' });
 </script>
@@ -154,9 +183,9 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
         type="search"
         class="input-field md:max-w-xs"
         placeholder="شماره سفارش، نام، موبایل..."
-        @keyup.enter="loadOrders"
+        @keyup.enter="searchOrders"
       />
-      <button class="btn-secondary text-sm" @click="loadOrders">جستجو</button>
+      <button class="btn-secondary text-sm" @click="searchOrders">جستجو</button>
       <AppDatePicker v-model="dateFrom" placeholder="از تاریخ" class="md:max-w-[180px]" />
       <AppDatePicker v-model="dateTo" placeholder="تا تاریخ" class="md:max-w-[180px]" :min="dateFrom" />
     </div>
@@ -229,6 +258,14 @@ useHead({ title: 'سفارش‌ها - پنل مدیریت' });
       </div>
       <EmptyState v-if="!orders.length" message="سفارشی یافت نشد" />
     </div>
+
+    <AppPagination
+      v-if="!loading && pagination && pagination.totalPages > 1"
+      :pagination="pagination"
+      compact
+      class="mt-6 max-w-3xl"
+      @update:page="goToPage"
+    />
 
     <!-- Order detail modal -->
     <div

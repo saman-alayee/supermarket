@@ -34,6 +34,8 @@ export interface Slider {
   linkUrl: string | null;
   sortOrder: number;
   placement: SliderPlacement;
+  categoryId?: string | null;
+  category?: { id: string; name: string; slug: string } | null;
   isActive: boolean;
 }
 

@@ -41,7 +41,7 @@ async function markAllRead() {
   await loadNotifications();
 }
 
-useHead({ title: 'اعلان‌ها - KIAA KALA' });
+useHead({ title: 'اعلان‌ها - Jetkala' });
 </script>
 
 <template>

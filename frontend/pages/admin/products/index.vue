@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product, Category, Tag, Pagination } from '~/types';
+import { getTodayGregorianIso, dayjs } from '~/utils/jalali';
 
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
@@ -20,7 +21,9 @@ const search = ref('');
 const barcodeFilter = ref('');
 const categoryFilter = ref('');
 const tagFilter = ref('');
-const expiryFilter = ref<'ALL' | 'WEEK' | 'EXPIRED'>('ALL');
+const expiryFilter = ref<'ALL' | 'WEEK' | 'EXPIRED' | 'RANGE'>('ALL');
+const expiryFrom = ref<string | null>(null);
+const expiryTo = ref<string | null>(null);
 
 const form = reactive({
   name: '',
@@ -87,6 +90,21 @@ function expiryTone(date?: string | null) {
   return 'text-gray-500';
 }
 
+function onExpiryFilterChange() {
+  if (expiryFilter.value !== 'RANGE') {
+    expiryFrom.value = null;
+    expiryTo.value = null;
+  }
+  resetToFirstPageAndLoad();
+}
+
+function clearExpiryRange() {
+  expiryFrom.value = null;
+  expiryTo.value = null;
+  if (expiryFilter.value === 'RANGE') expiryFilter.value = 'ALL';
+  resetToFirstPageAndLoad();
+}
+
 function resetToFirstPageAndLoad() {
   page.value = 1;
   void loadData();
@@ -104,16 +122,15 @@ async function loadData() {
     if (categoryFilter.value) params.set('categoryId', categoryFilter.value);
     if (tagFilter.value) params.set('tagId', tagFilter.value);
 
-    const today = new Date();
+    const today = getTodayGregorianIso();
     if (expiryFilter.value === 'EXPIRED') {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      params.set('expiringBefore', yesterday.toISOString().slice(0, 10));
+      params.set('expiringBefore', dayjs(today).subtract(1, 'day').format('YYYY-MM-DD'));
     } else if (expiryFilter.value === 'WEEK') {
-      const week = new Date(today);
-      week.setDate(week.getDate() + 7);
-      params.set('expiringAfter', today.toISOString().slice(0, 10));
-      params.set('expiringBefore', week.toISOString().slice(0, 10));
+      params.set('expiringAfter', today);
+      params.set('expiringBefore', dayjs(today).add(7, 'day').format('YYYY-MM-DD'));
+    } else if (expiryFilter.value === 'RANGE') {
+      if (expiryFrom.value) params.set('expiringAfter', expiryFrom.value.slice(0, 10));
+      if (expiryTo.value) params.set('expiringBefore', expiryTo.value.slice(0, 10));
     }
 
     const [prodRes, catRes, tagsRes] = await Promise.all([
@@ -255,12 +272,50 @@ useHead({ title: 'محصولات - پنل مدیریت' });
         class="md:max-w-xs"
         @update:model-value="resetToFirstPageAndLoad"
       />
-      <select v-model="expiryFilter" class="input-field md:w-44" @change="resetToFirstPageAndLoad">
+      <select v-model="expiryFilter" class="input-field md:w-44" @change="onExpiryFilterChange">
         <option value="ALL">همه تاریخ انقضا</option>
         <option value="WEEK">انقضا تا ۷ روز</option>
         <option value="EXPIRED">منقضی‌شده</option>
+        <option value="RANGE">بازه تاریخ انقضا</option>
       </select>
       <button class="btn-secondary text-sm" @click="resetToFirstPageAndLoad">اعمال فیلتر</button>
+    </div>
+
+    <div
+      v-if="expiryFilter === 'RANGE'"
+      class="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-4 p-4 rounded-xl border border-gray-100 bg-gray-50/80"
+    >
+      <div class="sm:max-w-[200px] flex-1">
+        <label class="block text-xs font-medium text-gray-600 mb-1">انقضا از تاریخ</label>
+        <AppDatePicker
+          v-model="expiryFrom"
+          placeholder="از تاریخ"
+          :max="expiryTo"
+          @update:model-value="resetToFirstPageAndLoad"
+        />
+      </div>
+      <div class="sm:max-w-[200px] flex-1">
+        <label class="block text-xs font-medium text-gray-600 mb-1">انقضا تا تاریخ</label>
+        <AppDatePicker
+          v-model="expiryTo"
+          placeholder="تا تاریخ"
+          :min="expiryFrom"
+          @update:model-value="resetToFirstPageAndLoad"
+        />
+      </div>
+      <div class="flex items-end gap-2">
+        <button
+          v-if="expiryFrom || expiryTo"
+          type="button"
+          class="btn-secondary text-sm"
+          @click="clearExpiryRange"
+        >
+          پاک کردن بازه
+        </button>
+      </div>
+      <p class="w-full text-xs text-gray-500 leading-relaxed">
+        محصولاتی که تاریخ انقضایشان در این بازه است نمایش داده می‌شوند. می‌توانید فقط «از» یا فقط «تا» هم بگذارید.
+      </p>
     </div>
 
     <div class="flex justify-between items-center mb-6">

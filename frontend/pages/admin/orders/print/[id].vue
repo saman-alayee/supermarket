@@ -29,7 +29,7 @@ useHead({ title: computed(() => (order.value ? `فیش ${order.value.orderNumber
     <p v-if="error" class="p-6 text-red-600">{{ error }}</p>
     <template v-else-if="order">
       <header class="mb-4 border-b-2 border-black pb-3">
-        <h1 class="text-xl font-black">KIAA KALA — فیش جمع‌آوری</h1>
+        <h1 class="text-xl font-black">Jetkala — فیش جمع‌آوری</h1>
         <p class="font-mono text-lg mt-1" dir="ltr">{{ order.orderNumber }}</p>
         <p class="text-sm text-gray-700">{{ formatShortDate(order.createdAt) }}</p>
       </header>

@@ -13,7 +13,7 @@ onMounted(async () => {
   }
 });
 
-useHead({ title: 'علاقه‌مندی‌ها - KIAA KALA' });
+useHead({ title: 'علاقه‌مندی‌ها - Jetkala' });
 </script>
 
 <template>

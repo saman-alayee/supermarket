@@ -4,7 +4,9 @@ import { config } from './index';
 let redis: Redis | null = null;
 
 export function getRedis(): Redis | null {
-  if (redis === null && process.env.REDIS_DISABLED !== 'true') {
+  if (process.env.REDIS_DISABLED === 'true') return null;
+
+  if (redis === null) {
     try {
       redis = new Redis(config.redisUrl, {
         maxRetriesPerRequest: 1,

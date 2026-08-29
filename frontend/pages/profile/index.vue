@@ -91,7 +91,7 @@ onMounted(async () => {
   }
 });
 
-useHead({ title: 'حساب کاربری - KIAA KALA' });
+useHead({ title: 'حساب کاربری - Jetkala' });
 </script>
 
 <template>

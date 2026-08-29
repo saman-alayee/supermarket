@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 const authStore = useAuthStore();
 const cartStore = useCartStore();
 const { toPersianDigits } = useFormat();
@@ -29,7 +31,7 @@ function handleSearch() {
             <input
               v-model="searchQuery"
               type="search"
-              placeholder="جستجو در KIAA KALA..."
+              :placeholder="`جستجو در ${SITE_NAME}...`"
               class="input-field pe-12 bg-gray-50"
             />
             <button type="submit" class="absolute end-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-600">
