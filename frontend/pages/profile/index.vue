@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
 const authStore = useAuthStore();
@@ -91,7 +93,7 @@ onMounted(async () => {
   }
 });
 
-useHead({ title: 'حساب کاربری - Jetkala' });
+useHead({ title: `حساب کاربری - ${SITE_NAME}` });
 </script>
 
 <template>

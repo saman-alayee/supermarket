@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 definePageMeta({ layout: 'profile' });
 
 const { fetchFavorites } = useFavorites();
@@ -13,7 +15,7 @@ onMounted(async () => {
   }
 });
 
-useHead({ title: 'علاقه‌مندی‌ها - Jetkala' });
+useHead({ title: `علاقه‌مندی‌ها - ${SITE_NAME}` });
 </script>
 
 <template>

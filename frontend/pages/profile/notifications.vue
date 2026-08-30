@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AppNotification } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
@@ -41,7 +42,7 @@ async function markAllRead() {
   await loadNotifications();
 }
 
-useHead({ title: 'اعلان‌ها - Jetkala' });
+useHead({ title: `اعلان‌ها - ${SITE_NAME}` });
 </script>
 
 <template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 const authStore = useAuthStore();
 const route = useRoute();
 
@@ -68,7 +70,7 @@ function switchMode(next: 'password' | 'otp') {
   password.value = '';
 }
 
-useHead({ title: 'ورود ادمین - Jetkala' });
+useHead({ title: `ورود ادمین - ${SITE_NAME}` });
 definePageMeta({ layout: false });
 </script>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Order, OrderStatus, Pagination } from '~/types';
 import { ORDER_STATUS_LABELS } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
@@ -37,7 +38,7 @@ async function loadOrders() {
   }
 }
 
-useHead({ title: 'سفارش‌های من - Jetkala' });
+useHead({ title: `سفارش‌های من - ${SITE_NAME}` });
 </script>
 
 <template>

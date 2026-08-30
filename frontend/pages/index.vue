@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Category, Product, Slider, HomeCategorySection } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const api = useApi();
 const route = useRoute();
@@ -121,7 +122,7 @@ watch(
   { immediate: true }
 );
 
-useHead({ title: 'Jetkala - فروشگاه اینترنتی' });
+useHead({ title: `${SITE_NAME} - فروشگاه اینترنتی` });
 </script>
 
 <template>

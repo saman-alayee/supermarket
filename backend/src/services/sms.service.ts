@@ -181,7 +181,7 @@ export class SmsService {
 
     await this.sendSimpleText(
       formatted,
-      `پیک کیاکال حرکت کرد و به زودی به آدرس شما می‌رسد.\nسفارش: ${orderNumber}`
+      `پیک ${SITE_NAME} حرکت کرد و به زودی به آدرس شما می‌رسد.\nسفارش: ${orderNumber}`
     );
   }
 

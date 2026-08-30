@@ -1,5 +1,6 @@
 import prisma from '../src/config/database';
 import { config } from '../src/config';
+import { SITE_NAME } from '../src/config/site';
 
 async function main() {
   for (const phone of config.adminPhones) {
@@ -10,7 +11,7 @@ async function main() {
         phone,
         role: 'ADMIN',
         firstName: 'مدیر',
-        lastName: 'Jetkala',
+        lastName: SITE_NAME,
         isActive: true,
       },
     });

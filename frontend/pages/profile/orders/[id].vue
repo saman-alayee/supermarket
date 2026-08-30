@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Order } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
@@ -31,7 +32,7 @@ async function copyOrderNumber() {
   }
 }
 
-useHead({ title: 'جزئیات سفارش - Jetkala' });
+useHead({ title: `جزئیات سفارش - ${SITE_NAME}` });
 </script>
 
 <template>

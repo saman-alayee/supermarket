@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Address } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
@@ -133,7 +134,7 @@ const hasFormErrors = computed(() =>
   Boolean(errors.street || errors.plaque || errors.unit || errors.map)
 );
 
-useHead({ title: 'آدرس‌ها - Jetkala' });
+useHead({ title: `آدرس‌ها - ${SITE_NAME}` });
 </script>
 
 <template>

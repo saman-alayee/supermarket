@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Category, Product, Tag, Pagination } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const route = useRoute();
 const api = useApi();
@@ -215,7 +216,7 @@ watch(slug, () => {
 
 onMounted(loadPageData);
 
-useHead({ title: `${category.value?.name || 'دسته‌بندی'} - Jetkala` });
+useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME}` });
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Category, Product, Pagination } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const api = useApi();
 const route = useRoute();
@@ -33,7 +34,7 @@ onMounted(() => {
   loadProducts();
 });
 
-useHead({ title: 'دسته‌بندی‌ها - Jetkala' });
+useHead({ title: `دسته‌بندی‌ها - ${SITE_NAME}` });
 </script>
 
 <template>

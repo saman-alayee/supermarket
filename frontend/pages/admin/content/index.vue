@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { ContentPage } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
 const api = useApi();
 const toast = useToast();
 
-const DEFAULT_TERMS = `# قوانین و مقررات Jetkala
+const DEFAULT_TERMS = `# قوانین و مقررات ${SITE_NAME}
 
 ## ۱. ثبت سفارش
 - ثبت سفارش به منزله پذیرش قیمت‌ها و شرایط فروشگاه است.

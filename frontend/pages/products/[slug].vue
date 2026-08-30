@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const route = useRoute();
 const api = useApi();
@@ -56,7 +57,7 @@ onMounted(async () => {
 
 watch(product, loadRelated);
 
-useHead({ title: `${product.value?.name || 'محصول'} - Jetkala` });
+useHead({ title: `${product.value?.name || 'محصول'} - ${SITE_NAME}` });
 </script>
 
 <template>

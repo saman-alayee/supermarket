@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Address, PaymentMethod } from '~/types';
 import { PAYMENT_METHOD_LABELS } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 import { useOrdersStore } from '~/stores/orders';
 
 const cartStore = useCartStore();
@@ -286,7 +287,7 @@ async function submitOrder() {
   }
 }
 
-useHead({ title: 'ثبت سفارش - Jetkala' });
+useHead({ title: `ثبت سفارش - ${SITE_NAME}` });
 </script>
 
 <template>

@@ -6,6 +6,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { config } from '../src/config';
+import { SITE_NAME } from '../src/config/site';
 
 const prisma = new PrismaClient();
 
@@ -346,7 +347,7 @@ const contentPages = [
   {
     slug: 'terms',
     title: 'قوانین و مقررات',
-    body: `# قوانین و مقررات Jetkala
+    body: `# قوانین و مقررات JET KALA
 
 ## ۱. ثبت سفارش
 - ثبت سفارش به منزله پذیرش قیمت‌ها و شرایط فروشگاه است.
@@ -364,10 +365,10 @@ const contentPages = [
   },
   {
     slug: 'about',
-    title: 'درباره Jetkala',
-    body: `# درباره Jetkala
+    title: 'درباره JET KALA',
+    body: `# درباره JET KALA
 
-فروشگاه آنلاین Jetkala با هدف تأمین سریع و آسان نیازهای روزانه خانواده‌ها راه‌اندازی شده است.
+فروشگاه آنلاین JET KALA با هدف تأمین سریع و آسان نیازهای روزانه خانواده‌ها راه‌اندازی شده است.
 
 ## خدمات ما
 - ارسال سریع در محدوده شهر
@@ -797,13 +798,13 @@ async function main() {
       update: {
         role: 'ADMIN' as UserRole,
         firstName: 'مدیر',
-        lastName: 'Jetkala',
+        lastName: 'JET KALA',
         isActive: true,
       },
       create: {
         phone: adminPhone,
         firstName: 'مدیر',
-        lastName: 'Jetkala',
+        lastName: 'JET KALA',
         role: 'ADMIN' as UserRole,
       },
     });
@@ -959,14 +960,14 @@ async function main() {
     });
 
     const existingWelcome = await prisma.notification.findFirst({
-      where: { userId: user.id, title: 'خوش آمدید به Jetkala' },
+      where: { userId: user.id, title: 'خوش آمدید به JET KALA' },
     });
     if (!existingWelcome) {
       await prisma.notification.create({
         data: {
           userId: user.id,
-          title: 'خوش آمدید به Jetkala',
-          message: `${customer.firstName} عزیز، از خرید آنلاین با Jetkala لذت ببرید.`,
+          title: 'خوش آمدید به JET KALA',
+          message: `${customer.firstName} عزیز، از خرید آنلاین با JET KALA لذت ببرید.`,
           type: NotificationType.GENERAL,
         },
       });

@@ -1,1 +1,1 @@
-export const SITE_NAME = 'Jetkala';
+export const SITE_NAME = 'JET KALA';

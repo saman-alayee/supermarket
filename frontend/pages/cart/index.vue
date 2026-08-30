@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const cartStore = useCartStore();
 const api = useApi();
@@ -36,7 +37,7 @@ watch(
   loadSuggestions
 );
 
-useHead({ title: 'سبد خرید - Jetkala' });
+useHead({ title: `سبد خرید - ${SITE_NAME}` });
 </script>
 
 <template>

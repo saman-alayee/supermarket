@@ -2,6 +2,8 @@
  * Polls for newly created orders in the admin panel.
  * Shows toast + banner + sound; unlocks audio after first user gesture.
  */
+import { SITE_NAME } from '~/constants/site';
+
 export function useNewOrderAlarm() {
   const api = useApi();
   const toast = useToast();
@@ -78,7 +80,7 @@ export function useNewOrderAlarm() {
     if (!import.meta.client || typeof Notification === 'undefined') return;
     if (Notification.permission !== 'granted') return;
     try {
-      const n = new Notification('سفارش جدید — Jetkala', {
+      const n = new Notification(`سفارش جدید — ${SITE_NAME}`, {
         body: `شماره سفارش: ${orderNumber}`,
         tag: `order-${orderNumber}`,
         dir: 'rtl',

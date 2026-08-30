@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 const { neshanMapsLink } = useGeocoding();
 
 const STORE_LAT = 37.419493;
@@ -9,7 +11,7 @@ const phones = [
   { label: 'پشتیبانی', value: '01342820303', href: 'tel:01342820303' },
 ];
 
-useHead({ title: 'تماس با ما - Jetkala' });
+useHead({ title: `تماس با ما - ${SITE_NAME}` });
 </script>
 
 <template>

@@ -40,7 +40,7 @@ async function fetchNominatim(lat: number, lng: number) {
   const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params.toString()}`, {
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'Jetkala-Supermarket/1.0 (contact: daftar72331222@gmail.com)',
+      'User-Agent': 'JET-KALA-Supermarket/1.0 (contact: daftar72331222@gmail.com)',
       Referer: 'http://localhost:3000',
     },
   });

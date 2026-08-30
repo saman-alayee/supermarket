@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Product, Pagination } from '~/types';
+import { SITE_NAME } from '~/constants/site';
 
 const route = useRoute();
 const api = useApi();
@@ -104,7 +105,7 @@ watch(
 );
 
 useHead(() => ({
-  title: `${pageTitle.value} - Jetkala`,
+  title: `${pageTitle.value} - ${SITE_NAME}`,
 }));
 </script>
 

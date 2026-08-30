@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 definePageMeta({ layout: 'profile', middleware: 'auth' });
 
 const authStore = useAuthStore();
@@ -111,7 +113,7 @@ async function submit() {
   }
 }
 
-useHead({ title: 'رمز عبور - Jetkala' });
+useHead({ title: `رمز عبور - ${SITE_NAME}` });
 </script>
 
 <template>

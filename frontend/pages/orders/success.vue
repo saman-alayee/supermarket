@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { SITE_NAME } from '~/constants/site';
+
 const route = useRoute();
 const orderNumber = route.query.number as string;
 
-useHead({ title: 'سفارش ثبت شد - Jetkala' });
+useHead({ title: `سفارش ثبت شد - ${SITE_NAME}` });
 </script>
 
 <template>
@@ -19,7 +21,7 @@ useHead({ title: 'سفارش ثبت شد - Jetkala' });
 
     <h1 class="text-2xl font-bold text-gray-800 mb-2">سفارش شما ثبت شد!</h1>
     <p class="text-gray-600 mb-2 leading-relaxed">سفارش در حال آماده‌سازی و ارسال است.</p>
-    <p class="text-sm text-primary-700 font-medium mb-6">پیک کیا کالا به زودی در راه است 🚚</p>
+    <p class="text-sm text-primary-700 font-medium mb-6">پیک {{ SITE_NAME }} به زودی در راه است 🚚</p>
 
     <div v-if="orderNumber" class="card p-4 mb-6">
       <p class="text-sm text-gray-500 mb-1">شماره سفارش</p>

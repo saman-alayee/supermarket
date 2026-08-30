@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NuxtError } from '#app';
+import { SITE_NAME } from '~/constants/site';
 
 const props = defineProps<{ error: NuxtError }>();
 
@@ -30,7 +31,7 @@ function goBack() {
 
 <template>
   <div class="error-page min-h-screen flex flex-col items-center justify-center px-6 text-center">
-    <img src="/logo.png" alt="Jetkala" class="w-16 h-16 object-contain mb-6" />
+    <img src="/logo.png" :alt="SITE_NAME" class="w-16 h-16 object-contain mb-6" />
 
     <p class="text-6xl font-bold text-primary-600 tabular-nums tracking-tight">
       {{ error?.statusCode || 404 }}
