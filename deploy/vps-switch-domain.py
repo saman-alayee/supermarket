@@ -87,10 +87,69 @@ certbot certonly --webroot -w /var/www/kiaakala \
   --deploy-hook "systemctl reload nginx" 2>&1 || \
 certbot certonly --nginx \
   -d jetkala.shop -d www.jetkala.shop \
-  --non-interactive --agree-tos -m {ADMIN_EMAIL} 2>&1
+  --non-interactive --agree-tos -m {ADMIN_EMAIL} 2>&1 || \
+echo "CERTBOT_WARN: SSL not issued yet (DNS may still be propagating)"
 
-echo "==> Stage 2: full nginx config"
-cp {REPO_DIR}/deploy/vps/nginx-jetkala.conf /etc/nginx/sites-available/jetkala
+echo "==> Stage 2: nginx config"
+if [ -f /etc/letsencrypt/live/jetkala.shop/fullchain.pem ]; then
+  cp {REPO_DIR}/deploy/vps/nginx-jetkala.conf /etc/nginx/sites-available/jetkala
+else
+  echo "Using HTTP-only nginx until SSL certificate is available"
+  cat > /etc/nginx/sites-available/jetkala <<'NGINX_HTTP'
+server {{
+    listen 80;
+    listen [::]:80;
+    server_name jetkala.shop www.jetkala.shop kiaakala.ir www.kiaakala.ir 45.94.215.57;
+
+    location ^~ /.well-known/ {{
+        alias /opt/kiaakala/ssl/.well-known/;
+        default_type text/plain;
+        allow all;
+    }}
+
+    client_max_body_size 10M;
+    root /var/www/kiaakala;
+    index index.html;
+
+    location /_nuxt/ {{
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }}
+
+    location /api/ {{
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Session-Id $http_x_session_id;
+    }}
+
+    location /uploads/ {{
+        alias /opt/kiaakala/api/uploads/;
+        expires 30d;
+        add_header Cache-Control "public";
+    }}
+
+    location /images/ {{
+        alias /var/www/kiaakala/images/;
+        expires 30d;
+        add_header Cache-Control "public";
+    }}
+
+    location = /sw.js {{
+        expires -1;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }}
+
+    location / {{
+        try_files $uri/index.html $uri /index.html;
+    }}
+}}
+NGINX_HTTP
+fi
 ln -sfn /etc/nginx/sites-available/jetkala /etc/nginx/sites-enabled/jetkala
 nginx -t && systemctl reload nginx
 
