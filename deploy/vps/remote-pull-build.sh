@@ -4,7 +4,8 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-/opt/kiaakala/src}"
 API_DIR="${API_DIR:-/opt/kiaakala/api}"
 WEB_DIR="${WEB_DIR:-/var/www/kiaakala}"
-NGINX_SRC="$REPO_DIR/deploy/vps/nginx-kiaakala.conf"
+NGINX_SRC="$REPO_DIR/deploy/vps/nginx-jetkala.conf"
+NGINX_SITE="jetkala"
 
 cd "$REPO_DIR"
 
@@ -91,8 +92,9 @@ cp -a "$REPO_DIR/frontend/.output/public/." "$WEB_DIR/"
 chown -R www-data:www-data "$WEB_DIR"
 
 if [ -f "$NGINX_SRC" ]; then
-  cp "$NGINX_SRC" /etc/nginx/sites-available/kiaakala
-  ln -sfn /etc/nginx/sites-available/kiaakala /etc/nginx/sites-enabled/kiaakala
+  cp "$NGINX_SRC" "/etc/nginx/sites-available/$NGINX_SITE"
+  ln -sfn "/etc/nginx/sites-available/$NGINX_SITE" "/etc/nginx/sites-enabled/$NGINX_SITE"
+  rm -f /etc/nginx/sites-enabled/kiaakala
   nginx -t && systemctl reload nginx
 fi
 
