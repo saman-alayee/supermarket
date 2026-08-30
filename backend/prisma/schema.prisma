@@ -167,6 +167,7 @@ model Product {
   isActive       Boolean   @default(true)
   isFeatured     Boolean   @default(false)
   isNew          Boolean   @default(false)
+  isOldPrice     Boolean   @default(false)
   categoryId     String
   tagId          String?
   createdAt      DateTime  @default(now())
@@ -186,6 +187,7 @@ model Product {
   @@index([expiryDate])
   @@index([isActive, isFeatured])
   @@index([isActive, isNew])
+  @@index([isActive, isOldPrice])
   @@map("products")
 }
 

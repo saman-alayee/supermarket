@@ -157,6 +157,7 @@ export interface Product {
   isActive: boolean;
   isFeatured: boolean;
   isNew: boolean;
+  isOldPrice: boolean;
   categoryId: string;
   tagId?: string | null;
   category?: { id: string; name: string; slug: string };

@@ -158,6 +158,7 @@ export class ProductService {
     tagId?: string | null;
     isFeatured?: boolean;
     isNew?: boolean;
+    isOldPrice?: boolean;
   }) {
     const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
     const imageList = normalizeImages(images, image);
@@ -453,6 +454,7 @@ export class ProductService {
     isActive: boolean;
     isFeatured: boolean;
     isNew: boolean;
+    isOldPrice: boolean;
     categoryId: string;
     tagId?: string | null;
     category?: { id: string; name: string; slug: string };

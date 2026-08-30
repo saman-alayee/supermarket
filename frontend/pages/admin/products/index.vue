@@ -42,6 +42,7 @@ const form = reactive({
   images: [] as string[],
   isFeatured: false,
   isNew: false,
+  isOldPrice: false,
   isActive: true,
 });
 
@@ -186,6 +187,7 @@ function openForm(product?: Product) {
       images: product.images?.length ? [...product.images] : product.image ? [product.image] : [],
       isFeatured: product.isFeatured,
       isNew: product.isNew,
+      isOldPrice: product.isOldPrice ?? false,
       isActive: product.isActive,
     });
   } else {
@@ -206,6 +208,7 @@ function openForm(product?: Product) {
       images: [],
       isFeatured: false,
       isNew: false,
+      isOldPrice: false,
       isActive: true,
     });
   }
@@ -505,6 +508,7 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             <div class="flex flex-wrap gap-2">
               <AppToggleChip v-model="form.isFeatured" label="ویژه" icon="lucide:sparkles" />
               <AppToggleChip v-model="form.isNew" label="جدید" icon="lucide:badge-plus" />
+              <AppToggleChip v-model="form.isOldPrice" label="قیمت قدیم" icon="lucide:badge-alert" />
               <AppToggleChip v-model="form.isActive" label="فعال" icon="lucide:eye" />
             </div>
           </div>

@@ -132,6 +132,7 @@ const productSchema = z.object({
   tagId: z.string().optional().nullable(),
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
+  isOldPrice: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

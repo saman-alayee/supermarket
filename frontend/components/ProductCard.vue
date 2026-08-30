@@ -88,13 +88,27 @@ async function handleDecrease(event: Event) {
       </div>
 
       <div
-        v-if="product.isNew"
-        :class="[
-          'absolute top-0 end-0 z-10 font-bold text-white bg-accent-500',
-          isCompact ? 'rounded-es-lg px-1.5 py-0.5 text-[9px]' : 'rounded-es-xl px-2 py-1 text-[10px]',
-        ]"
+        v-if="product.isNew || product.isOldPrice"
+        class="absolute top-0 end-0 z-10 flex flex-col items-end gap-0.5"
       >
-        جدید
+        <div
+          v-if="product.isNew"
+          :class="[
+            'font-bold text-white bg-accent-500',
+            isCompact ? 'rounded-es-lg px-1.5 py-0.5 text-[9px]' : 'rounded-es-xl px-2 py-1 text-[10px]',
+          ]"
+        >
+          جدید
+        </div>
+        <div
+          v-if="product.isOldPrice"
+          :class="[
+            'font-bold text-white bg-amber-600',
+            isCompact ? 'rounded-es-lg px-1.5 py-0.5 text-[8px] leading-tight' : 'rounded-es-xl px-2 py-1 text-[10px]',
+          ]"
+        >
+          {{ 'قیمت قدیم' }}
+        </div>
       </div>
 
       <button

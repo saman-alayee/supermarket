@@ -143,6 +143,20 @@ useHead({ title: `${product.value?.name || 'محصول'} - Jetkala` });
           <h1 class="text-xl md:text-2xl lg:text-[1.65rem] font-bold text-gray-900 leading-snug">
             {{ product.name }}
           </h1>
+          <div v-if="product.isNew || product.isOldPrice" class="mt-2 flex flex-wrap gap-2">
+            <span
+              v-if="product.isNew"
+              class="inline-flex items-center rounded-lg bg-accent-500 px-2.5 py-1 text-xs font-bold text-white"
+            >
+              جدید
+            </span>
+            <span
+              v-if="product.isOldPrice"
+              class="inline-flex items-center rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white"
+            >
+              قیمت قدیم
+            </span>
+          </div>
           <p v-if="product.unit" class="mt-1.5 text-sm text-gray-400">{{ product.unit }}</p>
 
           <div class="mt-5 rounded-2xl border border-gray-100 bg-white p-4 md:p-5 shadow-sm">
