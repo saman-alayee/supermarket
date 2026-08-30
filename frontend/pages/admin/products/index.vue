@@ -5,6 +5,7 @@ import { getTodayGregorianIso, dayjs } from '~/utils/jalali';
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
 const api = useApi();
+const toast = useToast();
 const { formatPrice, resolveMediaUrl, formatNumber, formatShortDate } = useFormat();
 
 const PAGE_SIZE = 20;
@@ -222,19 +223,40 @@ async function save() {
     images: form.images,
   };
 
-  if (editingId.value) {
-    await api.put(`/admin/products/${editingId.value}`, payload);
-  } else {
-    await api.post('/admin/products', payload);
+  try {
+    if (editingId.value) {
+      await api.put(`/admin/products/${editingId.value}`, payload);
+      toast.success('محصول به‌روزرسانی شد');
+    } else {
+      await api.post('/admin/products', payload);
+      toast.success('محصول ایجاد شد');
+    }
+    showForm.value = false;
+    await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ذخیره محصول');
   }
-  showForm.value = false;
-  await loadData();
 }
 
-async function remove(id: string) {
-  if (confirm('آیا از حذف این محصول مطمئن هستید؟')) {
-    await api.delete(`/admin/products/${id}`);
+async function deactivate(product: Product) {
+  if (!product.isActive) {
+    toast.info('این محصول از قبل غیرفعال است');
+    return;
+  }
+  if (
+    !confirm(
+      `محصول «${product.name}» از فروشگاه پنهان می‌شود (غیرفعال).\n\nرکورد در پنل باقی می‌ماند و می‌توانید بعداً دوباره فعالش کنید.`
+    )
+  ) {
+    return;
+  }
+
+  try {
+    await api.delete(`/admin/products/${product.id}`);
+    toast.success('محصول غیرفعال شد');
     await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در غیرفعال‌سازی محصول');
   }
 }
 
@@ -370,7 +392,14 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             </td>
             <td>
               <button class="text-primary-600 ms-2" @click="openForm(product)">ویرایش</button>
-              <button class="text-red-500" @click="remove(product.id)">حذف</button>
+              <button
+                class="text-amber-600"
+                :class="product.isActive ? '' : 'opacity-50 cursor-not-allowed'"
+                :disabled="!product.isActive"
+                @click="deactivate(product)"
+              >
+                غیرفعال‌سازی
+              </button>
             </td>
           </tr>
         </tbody>

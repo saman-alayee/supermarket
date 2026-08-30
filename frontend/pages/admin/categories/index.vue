@@ -4,6 +4,7 @@ import type { Category } from '~/types';
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
 const api = useApi();
+const toast = useToast();
 const { resolveMediaUrl } = useFormat();
 
 const categories = ref<Category[]>([]);
@@ -43,19 +44,37 @@ function openForm(category?: Category) {
 }
 
 async function save() {
-  if (editingId.value) {
-    await api.put(`/admin/categories/${editingId.value}`, form);
-  } else {
-    await api.post('/admin/categories', form);
+  try {
+    if (editingId.value) {
+      await api.put(`/admin/categories/${editingId.value}`, form);
+      toast.success('دسته‌بندی به‌روزرسانی شد');
+    } else {
+      await api.post('/admin/categories', form);
+      toast.success('دسته‌بندی ایجاد شد');
+    }
+    showForm.value = false;
+    await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در ذخیره دسته‌بندی');
   }
-  showForm.value = false;
-  await loadData();
 }
 
 async function remove(id: string) {
-  if (confirm('آیا مطمئن هستید؟')) {
+  const category = categories.value.find((item) => item.id === id);
+  const productCount = category?._count?.products ?? 0;
+  if (productCount > 0) {
+    toast.error(`این دسته ${productCount} محصول دارد و قابل حذف نیست. ابتدا محصولات را منتقل یا غیرفعال کنید.`);
+    return;
+  }
+  if (!confirm('آیا از حذف این دسته‌بندی مطمئن هستید؟')) return;
+
+  try {
     await api.delete(`/admin/categories/${id}`);
+    toast.success('دسته‌بندی حذف شد');
     await loadData();
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'خطا در حذف دسته‌بندی';
+    toast.error(message.includes('محصول') ? message : 'حذف انجام نشد. ممکن است این دسته هنوز محصول داشته باشد.');
   }
 }
 
@@ -88,9 +107,17 @@ useHead({ title: 'دسته‌بندی‌ها - پنل مدیریت' });
             <p class="text-xs text-gray-400">ترتیب: {{ cat.sortOrder }} | {{ cat._count?.products || 0 }} محصول</p>
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 shrink-0">
           <button class="text-primary-600 text-sm" @click="openForm(cat)">ویرایش</button>
-          <button class="text-red-500 text-sm" @click="remove(cat.id)">حذف</button>
+          <button
+            class="text-sm"
+            :class="(cat._count?.products ?? 0) > 0 ? 'text-gray-300 cursor-not-allowed' : 'text-red-500'"
+            :disabled="(cat._count?.products ?? 0) > 0"
+            :title="(cat._count?.products ?? 0) > 0 ? 'ابتدا محصولات این دسته را منتقل یا غیرفعال کنید' : 'حذف دسته‌بندی'"
+            @click="remove(cat.id)"
+          >
+            حذف
+          </button>
         </div>
       </div>
     </div>
