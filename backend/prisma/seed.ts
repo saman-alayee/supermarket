@@ -376,7 +376,7 @@ const contentPages = [
 - پشتیبانی پاسخگو
 
 ## آدرس
-kiaakala.ir`,
+jetkala.shop`,
   },
   {
     slug: 'privacy',
