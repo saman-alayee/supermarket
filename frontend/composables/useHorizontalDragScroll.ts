@@ -22,6 +22,10 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     return Boolean(target.closest('button, input, textarea, select, label, [role="button"]'));
   }
 
+  function onDragStart(event: DragEvent) {
+    event.preventDefault();
+  }
+
   function onPointerDown(event: PointerEvent) {
     const el = containerRef.value;
     if (!el || event.button !== 0 || shouldIgnoreDragStart(event.target)) return;
@@ -46,6 +50,9 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
       didDrag = true;
       el.setPointerCapture(event.pointerId);
       el.classList.add('is-dragging');
+      if (event.pointerType === 'mouse') {
+        event.preventDefault();
+      }
     }
 
     el.scrollLeft = startScrollLeft - delta;
@@ -114,6 +121,7 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     el.addEventListener('pointermove', onPointerMove);
     el.addEventListener('pointerup', onPointerUp);
     el.addEventListener('pointercancel', onPointerCancel);
+    el.addEventListener('dragstart', onDragStart);
     el.addEventListener('wheel', onWheel, { passive: false });
   }
 
@@ -124,6 +132,7 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     el.removeEventListener('pointermove', onPointerMove);
     el.removeEventListener('pointerup', onPointerUp);
     el.removeEventListener('pointercancel', onPointerCancel);
+    el.removeEventListener('dragstart', onDragStart);
     el.removeEventListener('wheel', onWheel);
   }
 

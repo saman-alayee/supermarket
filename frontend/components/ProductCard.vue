@@ -74,6 +74,7 @@ async function handleDecrease(event: Event) {
           :alt="product.name"
           class="h-full w-full object-cover"
           loading="lazy"
+          draggable="false"
         />
       </NuxtLink>
 

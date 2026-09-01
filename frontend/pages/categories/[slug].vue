@@ -7,6 +7,7 @@ const api = useApi();
 const slug = computed(() => route.params.slug as string);
 
 const PAGE_SIZE = 24;
+const STRIP_CHUNK = 8;
 const selectedTag = ref<string>((route.query.tag as string) || 'all');
 
 const { data: category } = await useAsyncData(
@@ -30,6 +31,15 @@ const listPagination = ref<Pagination | null>(null);
 const loading = ref(true);
 const loadingMore = ref(false);
 
+type SectionState = {
+  products: Product[];
+  page: number;
+  total: number;
+  loading: boolean;
+};
+
+const sectionStates = ref<Record<string, SectionState>>({});
+
 const hasMore = computed(() => {
   const p = listPagination.value;
   return !!p && p.page < p.totalPages;
@@ -47,7 +57,21 @@ const showTagBar = computed(() => displayTags.value.length > 0 || hasOtherGroup.
 
 const visibleSections = computed(() => {
   if (selectedTag.value === 'all') {
-    return grouped.value.filter((section) => section.products.length > 0);
+    return grouped.value
+      .filter((section) => section.products.length > 0)
+      .map((section) => {
+        const tagSlug = section.tag.slug;
+        const state = sectionStates.value[tagSlug];
+        const products = state?.products ?? section.products;
+        const total = state?.total ?? section.total;
+        return {
+          tag: section.tag,
+          products,
+          total,
+          hasMore: products.length < total,
+          loadingMore: state?.loading ?? false,
+        };
+      });
   }
   const tag =
     displayTags.value.find((item) => item.slug === selectedTag.value) ||
@@ -55,6 +79,70 @@ const visibleSections = computed(() => {
   if (!tag) return [];
   return [{ tag, products: tagProducts.value, total: listPagination.value?.total ?? tagProducts.value.length }];
 });
+
+function syncSectionStates() {
+  const next: Record<string, SectionState> = {};
+  for (const section of grouped.value) {
+    const tagSlug = section.tag.slug;
+    const existing = sectionStates.value[tagSlug];
+    next[tagSlug] = existing ?? {
+      products: section.products,
+      page: 1,
+      total: section.total,
+      loading: false,
+    };
+  }
+  sectionStates.value = next;
+}
+
+async function loadMoreForSection(tagSlug: string) {
+  const state = sectionStates.value[tagSlug];
+  if (!state || state.loading || state.products.length >= state.total) return;
+
+  sectionStates.value = {
+    ...sectionStates.value,
+    [tagSlug]: { ...state, loading: true },
+  };
+
+  try {
+    const tag = resolveTag(tagSlug);
+    const nextPage = Math.floor(state.products.length / STRIP_CHUNK) + 1;
+    const params = new URLSearchParams({
+      category: slug.value,
+      limit: String(STRIP_CHUNK),
+      page: String(nextPage),
+    });
+
+    if (tag && tagSlug !== 'other') {
+      params.set('tagId', tag.id);
+    }
+
+    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
+      `/products?${params}`
+    );
+
+    const existingIds = new Set(state.products.map((product) => product.id));
+    const batch =
+      tagSlug === 'other'
+        ? data.products.filter((product) => !product.tagId && !existingIds.has(product.id))
+        : data.products.filter((product) => !existingIds.has(product.id));
+
+    sectionStates.value = {
+      ...sectionStates.value,
+      [tagSlug]: {
+        products: [...state.products, ...batch],
+        page: nextPage,
+        total: state.total,
+        loading: false,
+      },
+    };
+  } catch {
+    sectionStates.value = {
+      ...sectionStates.value,
+      [tagSlug]: { ...state, loading: false },
+    };
+  }
+}
 
 function resolveTag(tagSlug: string): Tag | undefined {
   return (
@@ -75,6 +163,7 @@ async function loadGrouped() {
 
   tags.value = tagsRes.data;
   grouped.value = groupedRes.data.groups || [];
+  syncSectionStates();
 
   if (!grouped.value.length) {
     await loadFallbackPage(1);
@@ -176,7 +265,7 @@ function selectTag(tagSlug: string) {
     { replace: true }
   );
   if (tagSlug === 'all') {
-    listPagination.value = grouped.value.length ? null : listPagination.value;
+    syncSectionStates();
     return;
   }
   void loadTagProducts(tagSlug, 1);
@@ -216,6 +305,7 @@ watch(slug, () => {
   tagProducts.value = [];
   fallbackProducts.value = [];
   listPagination.value = null;
+  sectionStates.value = {};
   void loadPageData();
 });
 
@@ -312,19 +402,18 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
             <span v-if="section.tag?.icon">{{ section.tag.icon }}</span>
             {{ section.tag?.name || 'سایر محصولات' }}
           </h2>
-          <button
-            v-if="section.tag?.slug && section.total > section.products.length"
-            type="button"
-            class="text-xs text-primary-600 font-medium"
-            @click="selectTag(section.tag.slug)"
-          >
-            ادامه
-          </button>
+          <span v-if="section.total > section.products.length" class="text-xs text-gray-400">
+            {{ section.products.length }} از {{ section.total }}
+          </span>
         </div>
 
         <ProductCardList
           :products="section.products"
           :layout="selectedTag === 'all' ? 'strip' : 'grid'"
+          :has-more="section.hasMore"
+          :loading-more="section.loadingMore"
+          :reset-scroll-key="`${slug}-${section.tag?.slug || 'other'}`"
+          @load-more="loadMoreForSection(section.tag?.slug || 'other')"
         />
       </section>
 

@@ -6,9 +6,16 @@ const props = withDefaults(
     products: Product[];
     layout?: 'strip' | 'grid';
     density?: 'default' | 'compact';
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    resetScrollKey?: string | number;
   }>(),
-  { layout: 'grid', density: 'default' }
+  { layout: 'grid', density: 'default', hasMore: false, loadingMore: false }
 );
+
+const emit = defineEmits<{
+  'load-more': [];
+}>();
 
 const cardSize = computed(() => (props.density === 'compact' ? 'compact' : 'default'));
 const stripClass = computed(() =>
@@ -23,6 +30,14 @@ const canScrollPrev = ref(false);
 const canScrollNext = ref(false);
 
 useHorizontalDragScroll(stripRef);
+
+const canLoadMore = computed(() => props.hasMore && !props.loadingMore);
+
+const { sentinel: loadMoreSentinel } = useHorizontalInfiniteScroll(
+  stripRef,
+  () => emit('load-more'),
+  { enabled: canLoadMore }
+);
 
 function updateScrollState() {
   const el = stripRef.value;
@@ -48,9 +63,6 @@ onMounted(() => {
   if (props.layout !== 'strip') return;
   nextTick(() => {
     const el = stripRef.value;
-    if (el) {
-      el.scrollLeft = 0;
-    }
     updateScrollState();
     if (!el) return;
     el.addEventListener('scroll', updateScrollState, { passive: true });
@@ -71,13 +83,19 @@ onUnmounted(() => {
 });
 
 watch(
-  () => props.products,
-  () => nextTick(() => {
-    const el = stripRef.value;
-    if (el) el.scrollLeft = 0;
-    updateScrollState();
-  }),
-  { deep: true }
+  () => props.resetScrollKey,
+  () => {
+    nextTick(() => {
+      const el = stripRef.value;
+      if (el) el.scrollLeft = 0;
+      updateScrollState();
+    });
+  }
+);
+
+watch(
+  () => props.products.length,
+  () => nextTick(updateScrollState)
 );
 </script>
 
@@ -106,6 +124,15 @@ watch(
     <div ref="stripRef" dir="rtl" :class="stripClass">
       <div v-for="product in products" :key="product.id" :class="slotClass">
         <ProductCard :product="product" :size="cardSize" class="h-full" />
+      </div>
+      <div
+        v-if="hasMore"
+        ref="loadMoreSentinel"
+        class="product-card-strip-sentinel"
+        aria-hidden="true"
+      />
+      <div v-if="loadingMore" class="product-card-strip-loader" aria-hidden="true">
+        <span class="product-card-strip-loader-dot" />
       </div>
     </div>
   </div>
