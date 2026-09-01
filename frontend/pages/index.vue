@@ -36,7 +36,7 @@ const dealTab = ref<'discounted' | 'featured'>('discounted');
 
 const homeCategories = computed(() => categories.value ?? []);
 const categoryStripRef = ref<HTMLElement | null>(null);
-useHorizontalDragScroll(categoryStripRef);
+const { scrollByPage: scrollCategoryStrip } = useHorizontalDragScroll(categoryStripRef);
 
 const hasDeals = computed(() => discountedProducts.value.length > 0 || featuredProducts.value.length > 0);
 const showDealTabs = computed(() => discountedProducts.value.length > 0 && featuredProducts.value.length > 0);
@@ -174,13 +174,31 @@ useHead({ title: `${SITE_NAME} - فروشگاه اینترنتی` });
       <div class="px-4">
         <HomeSection title="دسته‌بندی‌ها" to="/categories" />
       </div>
-      <div ref="categoryStripRef" dir="rtl" class="category-home-strip px-4">
-        <CategoryCard
-          v-for="category in homeCategories"
-          :key="category.id"
-          :category="category"
-          size="md"
-        />
+      <div class="relative px-2 md:px-4">
+        <button
+          type="button"
+          class="category-scroll-btn category-scroll-btn--start"
+          aria-label="اسکرول دسته‌ها به عقب"
+          @click="scrollCategoryStrip(-1)"
+        >
+          <AppIcon name="lucide:chevron-right" size="md" />
+        </button>
+        <div ref="categoryStripRef" dir="rtl" class="category-home-strip px-2 md:px-10">
+          <CategoryCard
+            v-for="category in homeCategories"
+            :key="category.id"
+            :category="category"
+            size="md"
+          />
+        </div>
+        <button
+          type="button"
+          class="category-scroll-btn category-scroll-btn--end"
+          aria-label="اسکرول دسته‌ها به جلو"
+          @click="scrollCategoryStrip(1)"
+        >
+          <AppIcon name="lucide:chevron-left" size="md" />
+        </button>
       </div>
     </section>
 

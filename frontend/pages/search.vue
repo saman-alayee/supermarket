@@ -10,60 +10,68 @@ const PAGE_SIZE = 24;
 const query = ref('');
 const products = ref<Product[]>([]);
 const pagination = ref<Pagination | null>(null);
-const page = ref(1);
 const loading = ref(false);
+const loadingMore = ref(false);
 const pageTitle = ref('جستجو');
+
+const hasMore = computed(() => {
+  const p = pagination.value;
+  return !!p && p.page < p.totalPages;
+});
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function syncFromRoute() {
   query.value = (route.query.q as string) || '';
-  page.value = Math.max(1, parseInt(String(route.query.page || '1'), 10) || 1);
+}
+
+async function fetchProducts(page: number, append: boolean) {
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    page: String(page),
+  });
+
+  if (route.query.discounted === '1') {
+    pageTitle.value = 'محصولات تخفیف‌دار';
+    params.set('discounted', 'true');
+    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
+      `/products?${params}`
+    );
+    products.value = append ? [...products.value, ...data.products] : data.products;
+    pagination.value = data.pagination;
+    return;
+  }
+  if (route.query.featured === '1') {
+    pageTitle.value = 'محصولات ویژه';
+    params.set('featured', 'true');
+    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
+      `/products?${params}`
+    );
+    products.value = append ? [...products.value, ...data.products] : data.products;
+    pagination.value = data.pagination;
+    return;
+  }
+
+  pageTitle.value = 'جستجو';
+  const term = query.value.trim();
+  if (!term) {
+    products.value = [];
+    pagination.value = null;
+    return;
+  }
+
+  params.set('search', term);
+  const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
+    `/products?${params}`
+  );
+  products.value = append ? [...products.value, ...data.products] : data.products;
+  pagination.value = data.pagination;
 }
 
 async function loadSearch() {
   loading.value = true;
   try {
-    const params = new URLSearchParams({
-      limit: String(PAGE_SIZE),
-      page: String(page.value),
-    });
-
-    if (route.query.discounted === '1') {
-      pageTitle.value = 'محصولات تخفیف‌دار';
-      params.set('discounted', 'true');
-      const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-        `/products?${params}`
-      );
-      products.value = data.products;
-      pagination.value = data.pagination;
-      return;
-    }
-    if (route.query.featured === '1') {
-      pageTitle.value = 'محصولات ویژه';
-      params.set('featured', 'true');
-      const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-        `/products?${params}`
-      );
-      products.value = data.products;
-      pagination.value = data.pagination;
-      return;
-    }
-
-    pageTitle.value = 'جستجو';
-    const term = query.value.trim();
-    if (!term) {
-      products.value = [];
-      pagination.value = null;
-      return;
-    }
-
-    params.set('search', term);
-    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-      `/products?${params}`
-    );
-    products.value = data.products;
-    pagination.value = data.pagination;
+    await fetchProducts(1, false);
   } catch {
     products.value = [];
     pagination.value = null;
@@ -71,6 +79,20 @@ async function loadSearch() {
     loading.value = false;
   }
 }
+
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    await fetchProducts((pagination.value?.page ?? 1) + 1, true);
+  } catch {
+    /* keep existing list */
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
+const { sentinel: loadMoreSentinel } = useInfiniteScroll(loadMore);
 
 function onQueryInput() {
   if (debounceTimer) clearTimeout(debounceTimer);
@@ -85,18 +107,8 @@ function onQueryInput() {
   }, 350);
 }
 
-function goToPage(next: number) {
-  const q: Record<string, string> = {};
-  if (route.query.discounted === '1') q.discounted = '1';
-  else if (route.query.featured === '1') q.featured = '1';
-  else if (query.value.trim()) q.q = query.value.trim();
-  if (next > 1) q.page = String(next);
-  navigateTo({ path: '/search', query: q });
-  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
 watch(
-  () => [route.query.q, route.query.discounted, route.query.featured, route.query.page],
+  () => [route.query.q, route.query.discounted, route.query.featured],
   () => {
     syncFromRoute();
     void loadSearch();
@@ -132,7 +144,14 @@ useHead(() => ({
 
     <ProductCardList v-if="!loading" :products="products" />
 
-    <AppPagination :pagination="pagination" @update:page="goToPage" />
+    <div
+      v-if="!loading && products.length && (hasMore || loadingMore)"
+      class="py-6 flex flex-col items-center gap-2"
+    >
+      <div ref="loadMoreSentinel" class="h-1 w-full" aria-hidden="true" />
+      <LoadingSpinner :show="loadingMore" />
+      <p v-if="loadingMore" class="text-xs text-gray-400">در حال بارگذاری محصولات بیشتر…</p>
+    </div>
 
     <EmptyState v-if="!loading && !products.length" message="محصولی یافت نشد" />
   </div>

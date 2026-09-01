@@ -105,7 +105,7 @@ export default defineNuxtConfig({
     },
     workbox: {
       navigateFallback: '/',
-      navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
+      navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, /^\/\.well-known\//],
       globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,ttf}'],
       maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       cleanupOutdatedCaches: true,

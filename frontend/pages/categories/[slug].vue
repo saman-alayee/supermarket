@@ -8,7 +8,6 @@ const slug = computed(() => route.params.slug as string);
 
 const PAGE_SIZE = 24;
 const selectedTag = ref<string>((route.query.tag as string) || 'all');
-const page = ref(Math.max(1, parseInt(String(route.query.page || '1'), 10) || 1));
 
 const { data: category } = await useAsyncData(
   () => `category-${slug.value}`,
@@ -29,6 +28,12 @@ const tagProducts = ref<Product[]>([]);
 const fallbackProducts = ref<Product[]>([]);
 const listPagination = ref<Pagination | null>(null);
 const loading = ref(true);
+const loadingMore = ref(false);
+
+const hasMore = computed(() => {
+  const p = listPagination.value;
+  return !!p && p.page < p.totalPages;
+});
 
 const hasOtherGroup = computed(() => grouped.value.some((section) => section.tag.slug === 'other'));
 
@@ -79,7 +84,7 @@ async function loadGrouped() {
   }
 }
 
-async function loadFallbackPage(nextPage: number) {
+async function loadFallbackPage(nextPage: number, append = false) {
   const params = new URLSearchParams({
     category: slug.value,
     limit: String(PAGE_SIZE),
@@ -88,12 +93,13 @@ async function loadFallbackPage(nextPage: number) {
   const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
     `/products?${params}`
   );
-  fallbackProducts.value = data.products;
+  fallbackProducts.value = append
+    ? [...fallbackProducts.value, ...data.products]
+    : data.products;
   listPagination.value = data.pagination;
-  page.value = data.pagination?.page ?? nextPage;
 }
 
-async function loadTagProducts(tagSlug: string, nextPage = 1) {
+async function loadTagProducts(tagSlug: string, nextPage = 1, append = false) {
   // Overview strips already show first 8 — only skip fetch when viewing full list on page 1
   // and cache already has the complete set
   const cached = grouped.value.find((section) => section.tag.slug === tagSlug);
@@ -136,15 +142,13 @@ async function loadTagProducts(tagSlug: string, nextPage = 1) {
   );
 
   if (tagSlug === 'other') {
-    // Backend can't filter null tagId via tagId param — filter client-side from category list
-    // Better: request without tagId and filter; for pagination accuracy, use category only
-    tagProducts.value = data.products.filter((product) => !product.tagId);
+    const batch = data.products.filter((product) => !product.tagId);
+    tagProducts.value = append ? [...tagProducts.value, ...batch] : batch;
     listPagination.value = data.pagination;
   } else {
-    tagProducts.value = data.products;
+    tagProducts.value = append ? [...tagProducts.value, ...data.products] : data.products;
     listPagination.value = data.pagination;
   }
-  page.value = data.pagination?.page ?? nextPage;
 }
 
 async function loadPageData() {
@@ -152,7 +156,7 @@ async function loadPageData() {
   try {
     await loadGrouped();
     if (selectedTag.value !== 'all') {
-      await loadTagProducts(selectedTag.value, page.value);
+      await loadTagProducts(selectedTag.value, 1);
     }
   } finally {
     loading.value = false;
@@ -161,7 +165,9 @@ async function loadPageData() {
 
 function selectTag(tagSlug: string) {
   selectedTag.value = tagSlug;
-  page.value = 1;
+  tagProducts.value = [];
+  fallbackProducts.value = [];
+  listPagination.value = null;
   navigateTo(
     {
       path: route.path,
@@ -176,41 +182,40 @@ function selectTag(tagSlug: string) {
   void loadTagProducts(tagSlug, 1);
 }
 
-async function goToPage(next: number) {
-  page.value = next;
-  const query: Record<string, string> = {};
-  if (selectedTag.value !== 'all') query.tag = selectedTag.value;
-  if (next > 1) query.page = String(next);
-  await navigateTo({ path: route.path, query }, { replace: true });
-
-  loading.value = true;
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
   try {
+    const nextPage = (listPagination.value?.page ?? 1) + 1;
     if (selectedTag.value === 'all' && !grouped.value.length) {
-      await loadFallbackPage(next);
+      await loadFallbackPage(nextPage, true);
     } else if (selectedTag.value !== 'all') {
-      await loadTagProducts(selectedTag.value, next);
+      await loadTagProducts(selectedTag.value, nextPage, true);
     }
   } finally {
-    loading.value = false;
+    loadingMore.value = false;
   }
-  if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+const { sentinel: loadMoreSentinel } = useInfiniteScroll(loadMore);
+
 watch(
-  () => [route.query.tag, route.query.page],
-  async ([tag, pageQ]) => {
+  () => route.query.tag,
+  async (tag) => {
     selectedTag.value = (tag as string) || 'all';
-    page.value = Math.max(1, parseInt(String(pageQ || '1'), 10) || 1);
     if (selectedTag.value !== 'all') {
       if (!grouped.value.length) await loadGrouped();
-      await loadTagProducts(selectedTag.value, page.value);
+      tagProducts.value = [];
+      await loadTagProducts(selectedTag.value, 1);
     }
   }
 );
 
 watch(slug, () => {
   selectedTag.value = 'all';
-  page.value = 1;
+  tagProducts.value = [];
+  fallbackProducts.value = [];
+  listPagination.value = null;
   void loadPageData();
 });
 
@@ -333,10 +338,12 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
       </section>
 
       <div
-        v-if="selectedTag !== 'all' || (!grouped.length && fallbackProducts.length)"
-        class="px-4"
+        v-if="(selectedTag !== 'all' || (!grouped.length && fallbackProducts.length)) && (hasMore || loadingMore)"
+        class="px-4 py-6 flex flex-col items-center gap-2"
       >
-        <AppPagination :pagination="listPagination" @update:page="goToPage" />
+        <div ref="loadMoreSentinel" class="h-1 w-full" aria-hidden="true" />
+        <LoadingSpinner :show="loadingMore" />
+        <p v-if="loadingMore" class="text-xs text-gray-400">در حال بارگذاری محصولات بیشتر…</p>
       </div>
     </div>
   </div>

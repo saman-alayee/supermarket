@@ -35,7 +35,7 @@ for ln in lines:
         out.append(ln)
 if not seen:
     out.append('CORS_ORIGIN={CORS}')
-p.write_text('\\n'.join(out) + '\\n', encoding='utf-8')
+p.write_text(chr(10).join(out) + chr(10), encoding='utf-8')
 print('CORS_OK')
 PY
 pm2 restart kiaakala-api --update-env

@@ -255,11 +255,29 @@ async function deactivate(product: Product) {
   }
 
   try {
-    await api.delete(`/admin/products/${product.id}`);
+    await api.put(`/admin/products/${product.id}`, { isActive: false });
     toast.success('محصول غیرفعال شد');
     await loadData();
   } catch (e: unknown) {
     toast.error(e instanceof Error ? e.message : 'خطا در غیرفعال‌سازی محصول');
+  }
+}
+
+async function activate(product: Product) {
+  if (product.isActive) {
+    toast.info('این محصول از قبل فعال است');
+    return;
+  }
+  if (!confirm(`محصول «${product.name}» دوباره در فروشگاه نمایش داده شود؟`)) {
+    return;
+  }
+
+  try {
+    await api.put(`/admin/products/${product.id}`, { isActive: true });
+    toast.success('محصول فعال شد');
+    await loadData();
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : 'خطا در فعال‌سازی محصول');
   }
 }
 
@@ -396,12 +414,18 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             <td>
               <button class="text-primary-600 ms-2" @click="openForm(product)">ویرایش</button>
               <button
+                v-if="product.isActive"
                 class="text-amber-600"
-                :class="product.isActive ? '' : 'opacity-50 cursor-not-allowed'"
-                :disabled="!product.isActive"
                 @click="deactivate(product)"
               >
                 غیرفعال‌سازی
+              </button>
+              <button
+                v-else
+                class="text-green-600"
+                @click="activate(product)"
+              >
+                فعال‌سازی
               </button>
             </td>
           </tr>
