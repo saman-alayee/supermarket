@@ -1,5 +1,8 @@
+import path from 'path';
 import dotenv from 'dotenv';
-dotenv.config();
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 function normalizeAdminPhone(phone: string): string {
   let normalized = phone

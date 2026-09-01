@@ -99,6 +99,30 @@ if [ -f "$NGINX_SRC" ]; then
 fi
 
 cd "$API_DIR"
+# Inject .env into the process so Prisma always sees DATABASE_URL (PM2 does not load .env).
+python3 - <<'PY'
+from pathlib import Path
+src = Path('/opt/kiaakala/api/.env')
+dst = Path('/tmp/kiaakala-api-pm2.env')
+lines = []
+for raw in src.read_text(encoding='utf-8').splitlines():
+    line = raw.strip()
+    if not line or line.startswith('#') or '=' not in line:
+        continue
+    key, value = line.split('=', 1)
+    key = key.strip()
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in '\'"':
+        value = value[1:-1]
+    escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+    lines.append(f'{key}="{escaped}"')
+dst.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+print('PM2_ENV_KEYS', len(lines))
+PY
+set -a
+# shellcheck disable=SC1091
+. /tmp/kiaakala-api-pm2.env
+set +a
 pm2 delete kiaakala-api 2>/dev/null || true
 pm2 start dist/index.js --name kiaakala-api --cwd "$API_DIR"
 pm2 save
