@@ -41,10 +41,11 @@ useHead({ title: `دسته‌بندی‌ها - ${SITE_NAME}` });
   <div class="px-4 py-4">
     <h1 class="section-title">دسته‌بندی‌ها</h1>
 
-    <div class="flex gap-3 overflow-x-auto scrollbar-hide pb-4 mb-4">
+    <ChipStrip class="gap-3 pb-4 mb-4">
       <NuxtLink
         to="/categories"
         class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-primary-600 text-white"
+        draggable="false"
       >
         همه
       </NuxtLink>
@@ -53,10 +54,11 @@ useHead({ title: `دسته‌بندی‌ها - ${SITE_NAME}` });
         :key="category.id"
         :to="`/categories/${category.slug}`"
         class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+        draggable="false"
       >
         {{ category.name }}
       </NuxtLink>
-    </div>
+    </ChipStrip>
 
     <LoadingSpinner :show="loading" />
 

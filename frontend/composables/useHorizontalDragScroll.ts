@@ -1,16 +1,19 @@
 /**
  * Horizontal scroll: touch/mouse drag (lazy threshold), wheel on desktop, programmatic scroll.
+ * Native image/link drag is blocked so desktop scrolling works while the cursor is over a product.
  */
 export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
   const isDragging = ref(false);
 
   let startX = 0;
+  let startY = 0;
   let startScrollLeft = 0;
   let activePointerId: number | null = null;
   let pendingPointer = false;
   let didDrag = false;
+  let windowBound = false;
 
-  const DRAG_THRESHOLD_MOUSE = 10;
+  const DRAG_THRESHOLD_MOUSE = 8;
   const DRAG_THRESHOLD_TOUCH = 6;
 
   function dragThreshold(pointerType: string) {
@@ -19,6 +22,7 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
 
   function shouldIgnoreDragStart(target: EventTarget | null) {
     if (!(target instanceof Element)) return false;
+    if (target.closest('.chip-strip')) return false;
     return Boolean(target.closest('button, input, textarea, select, label, [role="button"]'));
   }
 
@@ -26,36 +30,67 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     event.preventDefault();
   }
 
+  function bindWindowPointer() {
+    if (windowBound) return;
+    windowBound = true;
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+  }
+
+  function unbindWindowPointer() {
+    if (!windowBound) return;
+    windowBound = false;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerCancel);
+  }
+
   function onPointerDown(event: PointerEvent) {
     const el = containerRef.value;
     if (!el || event.button !== 0 || shouldIgnoreDragStart(event.target)) return;
+    // Touch keeps native pan so a vertical swipe on a product still scrolls the page.
+    if (event.pointerType === 'touch') return;
 
     pendingPointer = true;
     isDragging.value = false;
     didDrag = false;
     activePointerId = event.pointerId;
     startX = event.clientX;
+    startY = event.clientY;
     startScrollLeft = el.scrollLeft;
+    bindWindowPointer();
   }
 
   function onPointerMove(event: PointerEvent) {
     const el = containerRef.value;
     if (!el || activePointerId !== event.pointerId || !pendingPointer) return;
 
-    const delta = event.clientX - startX;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
 
     if (!isDragging.value) {
-      if (Math.abs(delta) <= dragThreshold(event.pointerType)) return;
+      const threshold = dragThreshold(event.pointerType);
+      if (Math.abs(deltaX) <= threshold && Math.abs(deltaY) <= threshold) return;
+      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        abortPending();
+        return;
+      }
       isDragging.value = true;
       didDrag = true;
-      el.setPointerCapture(event.pointerId);
-      el.classList.add('is-dragging');
-      if (event.pointerType === 'mouse') {
-        event.preventDefault();
+      try {
+        el.setPointerCapture(event.pointerId);
+      } catch {
+        // ignore
       }
+      el.classList.add('is-dragging');
     }
 
-    el.scrollLeft = startScrollLeft - delta;
+    if (event.pointerType === 'mouse') {
+      event.preventDefault();
+    }
+
+    el.scrollLeft = startScrollLeft - deltaX;
   }
 
   function onPointerUp(event: PointerEvent) {
@@ -66,6 +101,14 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
   function onPointerCancel(event: PointerEvent) {
     if (activePointerId !== event.pointerId) return;
     finishDrag();
+  }
+
+  function abortPending() {
+    unbindWindowPointer();
+    pendingPointer = false;
+    isDragging.value = false;
+    didDrag = false;
+    activePointerId = null;
   }
 
   function finishDrag() {
@@ -87,6 +130,7 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
       el.addEventListener('click', blockClick, { capture: true, once: true });
     }
 
+    unbindWindowPointer();
     pendingPointer = false;
     isDragging.value = false;
     activePointerId = null;
@@ -100,6 +144,9 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     const delta =
       Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
     if (Math.abs(delta) < 2) return;
+
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    if (maxScroll <= 1) return;
 
     const before = el.scrollLeft;
     el.scrollLeft += delta;
@@ -118,22 +165,17 @@ export function useHorizontalDragScroll(containerRef: Ref<HTMLElement | null>) {
     const el = containerRef.value;
     if (!el) return;
     el.addEventListener('pointerdown', onPointerDown);
-    el.addEventListener('pointermove', onPointerMove);
-    el.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('pointercancel', onPointerCancel);
-    el.addEventListener('dragstart', onDragStart);
-    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('dragstart', onDragStart, true);
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
   }
 
   function unbind() {
+    unbindWindowPointer();
     const el = containerRef.value;
     if (!el) return;
     el.removeEventListener('pointerdown', onPointerDown);
-    el.removeEventListener('pointermove', onPointerMove);
-    el.removeEventListener('pointerup', onPointerUp);
-    el.removeEventListener('pointercancel', onPointerCancel);
-    el.removeEventListener('dragstart', onDragStart);
-    el.removeEventListener('wheel', onWheel);
+    el.removeEventListener('dragstart', onDragStart, true);
+    el.removeEventListener('wheel', onWheel, true);
   }
 
   onMounted(() => nextTick(bind));

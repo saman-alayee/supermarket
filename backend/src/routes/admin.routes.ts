@@ -133,6 +133,8 @@ const productSchema = z.object({
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
   isOldPrice: z.boolean().optional(),
+  isHomeDeal: z.boolean().optional(),
+  isHomeFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -151,6 +153,28 @@ router.get(
       limit: Math.min(req.query.limit ? parseInt(req.query.limit as string) : 20, 50),
     });
     successResponse(res, result);
+  })
+);
+
+router.get(
+  '/products/home-picks',
+  asyncHandler(async (_req, res) => {
+    const picks = await productService.getHomePicks();
+    successResponse(res, picks);
+  })
+);
+
+const homePicksSchema = z.object({
+  discountedIds: z.array(z.string()).max(10).optional(),
+  featuredIds: z.array(z.string()).max(10).optional(),
+});
+
+router.put(
+  '/products/home-picks',
+  validate(homePicksSchema),
+  asyncHandler(async (req, res) => {
+    const picks = await productService.setHomePicks(req.body);
+    successResponse(res, picks, 'محصولات صفحه اول ذخیره شد');
   })
 );
 

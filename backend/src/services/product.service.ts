@@ -15,6 +15,8 @@ interface ProductFilters {
   expiringAfter?: string;
   featured?: boolean;
   discounted?: boolean;
+  homeDeal?: boolean;
+  homeFeatured?: boolean;
   isNew?: boolean;
   page?: number;
   limit?: number;
@@ -51,6 +53,8 @@ export class ProductService {
       expiringAfter,
       featured,
       discounted,
+      homeDeal,
+      homeFeatured,
       isNew,
       page = 1,
       limit = 20,
@@ -69,6 +73,8 @@ export class ProductService {
     if (featured) where.isFeatured = true;
     if (isNew) where.isNew = true;
     if (discounted) where.discountPrice = { not: null };
+    if (homeDeal) where.isHomeDeal = true;
+    if (homeFeatured) where.isHomeFeatured = true;
     if (barcode?.trim()) {
       where.barcode = textContains(barcode.trim());
     }
@@ -100,11 +106,20 @@ export class ProductService {
     const cached = await cacheGet<unknown>(cacheKey);
     if (cached) return cached;
 
+    const curatedList = Boolean(homeDeal || homeFeatured || featured);
+    const orderBy = homeDeal
+      ? [{ homeDealSort: 'asc' as const }, { createdAt: 'desc' as const }]
+      : homeFeatured
+        ? [{ homeFeaturedSort: 'asc' as const }, { createdAt: 'desc' as const }]
+        : featured
+          ? [{ homeFeaturedSort: 'asc' as const }, { createdAt: 'desc' as const }]
+          : { createdAt: 'desc' as const };
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
         include: productInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -113,7 +128,7 @@ export class ProductService {
 
     const formatted = products.map((product) => this.formatProduct(product));
     const result = {
-      products: this.sortByDiscountPercent(formatted),
+      products: curatedList ? formatted : this.sortByDiscountPercent(formatted),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
 
@@ -159,6 +174,8 @@ export class ProductService {
     isFeatured?: boolean;
     isNew?: boolean;
     isOldPrice?: boolean;
+    isHomeDeal?: boolean;
+    isHomeFeatured?: boolean;
   }) {
     const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
     const imageList = normalizeImages(images, image);
@@ -231,12 +248,98 @@ export class ProductService {
     await cacheDel('home:*');
   }
 
+  async getHomePicks() {
+    const [discounted, featured] = await Promise.all([
+      prisma.product.findMany({
+        where: { isHomeDeal: true },
+        include: productInclude,
+        orderBy: [{ homeDealSort: 'asc' }, { createdAt: 'desc' }],
+        take: 10,
+      }),
+      prisma.product.findMany({
+        where: { isHomeFeatured: true },
+        include: productInclude,
+        orderBy: [{ homeFeaturedSort: 'asc' }, { createdAt: 'desc' }],
+        take: 10,
+      }),
+    ]);
+
+    return {
+      discounted: discounted.map((product) => this.formatProduct(product)),
+      featured: featured.map((product) => this.formatProduct(product)),
+    };
+  }
+
+  async setHomePicks(data: { discountedIds?: string[]; featuredIds?: string[] }) {
+    const updateDiscounted = data.discountedIds !== undefined;
+    const updateFeatured = data.featuredIds !== undefined;
+    const discountedIds = updateDiscounted ? this.normalizeHomePickIds(data.discountedIds) : [];
+    const featuredIds = updateFeatured ? this.normalizeHomePickIds(data.featuredIds) : [];
+
+    await this.assertProductsExist([...new Set([...discountedIds, ...featuredIds])]);
+
+    const operations = [
+      ...(updateDiscounted
+        ? [
+            prisma.product.updateMany({
+              where: { isHomeDeal: true },
+              data: { isHomeDeal: false, homeDealSort: 0 },
+            }),
+            ...discountedIds.map((id, index) =>
+              prisma.product.update({
+                where: { id },
+                data: { isHomeDeal: true, homeDealSort: index },
+              })
+            ),
+          ]
+        : []),
+      ...(updateFeatured
+        ? [
+            prisma.product.updateMany({
+              where: { isHomeFeatured: true },
+              data: { isHomeFeatured: false, homeFeaturedSort: 0 },
+            }),
+            ...featuredIds.map((id, index) =>
+              prisma.product.update({
+                where: { id },
+                data: { isHomeFeatured: true, homeFeaturedSort: index },
+              })
+            ),
+          ]
+        : []),
+    ];
+
+    if (operations.length) {
+      await prisma.$transaction(operations);
+    }
+
+    await cacheDel('products:*');
+    await cacheDel('home:*');
+    return this.getHomePicks();
+  }
+
+  private normalizeHomePickIds(ids?: string[]) {
+    const unique = [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
+    if (unique.length > 10) {
+      throw new AppError(400, 'حداکثر ۱۰ محصول برای صفحه اول می‌توانید انتخاب کنید');
+    }
+    return unique;
+  }
+
+  private async assertProductsExist(ids: string[]) {
+    if (!ids.length) return;
+    const count = await prisma.product.count({ where: { id: { in: ids } } });
+    if (count !== ids.length) {
+      throw new AppError(400, 'یکی از محصولات انتخاب‌شده پیدا نشد');
+    }
+  }
+
   async getHomeSections() {
     const cacheKey = 'home:sections';
     const cached = await cacheGet<unknown>(cacheKey);
     if (cached) return cached;
 
-    const [featured, discounted, newProducts] = await Promise.all([
+    const [featured, discounted, newProducts, homeDeals, homeFeatured] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true, isFeatured: true },
         include: productInclude,
@@ -255,12 +358,26 @@ export class ProductService {
         take: 8,
         orderBy: { createdAt: 'desc' },
       }),
+      prisma.product.findMany({
+        where: { isActive: true, isHomeDeal: true },
+        include: productInclude,
+        take: 10,
+        orderBy: [{ homeDealSort: 'asc' }, { createdAt: 'desc' }],
+      }),
+      prisma.product.findMany({
+        where: { isActive: true, isHomeFeatured: true },
+        include: productInclude,
+        take: 10,
+        orderBy: [{ homeFeaturedSort: 'asc' }, { createdAt: 'desc' }],
+      }),
     ]);
 
     const result = {
       featured: featured.map((product) => this.formatProduct(product)),
       discounted: discounted.map((product) => this.formatProduct(product)),
       newProducts: newProducts.map((product) => this.formatProduct(product)),
+      homeDeals: homeDeals.map((product) => this.formatProduct(product)),
+      homeFeatured: homeFeatured.map((product) => this.formatProduct(product)),
     };
 
     await cacheSet(cacheKey, result, 300);
@@ -455,6 +572,10 @@ export class ProductService {
     isFeatured: boolean;
     isNew: boolean;
     isOldPrice: boolean;
+    isHomeDeal?: boolean;
+    homeDealSort?: number;
+    isHomeFeatured?: boolean;
+    homeFeaturedSort?: number;
     categoryId: string;
     tagId?: string | null;
     category?: { id: string; name: string; slug: string };

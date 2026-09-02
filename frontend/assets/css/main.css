@@ -109,12 +109,16 @@
     }
   }
 
+  .product-card {
+    touch-action: manipulation;
+  }
+
   .product-card-strip {
     @apply flex flex-nowrap items-stretch gap-3 overflow-x-auto overscroll-x-contain scrollbar-hide pb-2 pt-0.5 px-0.5 cursor-grab select-none;
     direction: rtl;
     max-width: 100%;
     min-width: 0;
-    touch-action: pan-x pinch-zoom;
+    touch-action: pan-x pan-y pinch-zoom;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -126,9 +130,16 @@
     @apply cursor-grabbing;
   }
 
+  .product-card-strip a,
   .product-card-strip img {
     -webkit-user-drag: none;
     user-select: none;
+  }
+
+  .product-card-strip.is-dragging,
+  .product-card-strip.is-dragging a,
+  .product-card-strip.is-dragging img {
+    cursor: grabbing;
   }
 
   .product-card-strip.is-dragging a {
@@ -153,17 +164,41 @@
     @apply h-5 w-5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin;
   }
 
+  .chip-strip {
+    @apply flex flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain scrollbar-hide;
+    max-width: 100%;
+    min-width: 0;
+    touch-action: pan-x pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chip-strip > * {
+    @apply shrink-0;
+  }
+
+  .chip-strip a,
+  .chip-strip button {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
   .category-home-strip {
     @apply flex flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain scrollbar-hide pb-1 cursor-grab select-none snap-x snap-mandatory;
     direction: rtl;
     max-width: 100%;
     min-width: 0;
-    touch-action: pan-y;
+    touch-action: pan-x pan-y pinch-zoom;
     -webkit-overflow-scrolling: touch;
   }
 
   .category-home-strip > * {
     @apply snap-start;
+  }
+
+  .category-home-strip a,
+  .category-home-strip img {
+    -webkit-user-drag: none;
+    user-select: none;
   }
 
   .category-home-strip.is-dragging {

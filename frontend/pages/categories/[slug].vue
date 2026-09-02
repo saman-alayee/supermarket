@@ -316,13 +316,14 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
 
 <template>
   <div class="pb-8">
-    <div class="px-4 pt-4 pb-3 sticky top-14 z-30 bg-gray-50/95 backdrop-blur border-b border-gray-100">
+    <div class="sticky top-14 z-30 min-w-0 bg-gray-50/95 backdrop-blur border-b border-gray-100 px-4 pt-4 pb-3">
       <h1 class="section-title mb-3">{{ category?.name }}</h1>
 
-      <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1">
+      <ChipStrip class="pb-3 mb-1">
         <NuxtLink
           to="/categories"
-          class="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-gray-100 text-gray-600"
+          class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-gray-100 text-gray-600"
+          draggable="false"
         >
           همه
         </NuxtLink>
@@ -331,17 +332,18 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
           :key="item.id"
           :to="`/categories/${item.slug}`"
           :class="[
-            'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
+            'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
             item.slug === slug
               ? 'bg-primary-600 text-white'
               : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
           ]"
+          draggable="false"
         >
           {{ item.name }}
         </NuxtLink>
-      </div>
+      </ChipStrip>
 
-      <div v-if="showTagBar" class="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <ChipStrip v-if="showTagBar" class="pb-1">
         <button
           type="button"
           :class="[
@@ -386,7 +388,7 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
           <span class="text-base">📦</span>
           سایر
         </button>
-      </div>
+      </ChipStrip>
     </div>
 
     <LoadingSpinner :show="loading" />

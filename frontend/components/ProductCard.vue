@@ -68,11 +68,11 @@ async function handleDecrease(event: Event) {
         isCompact ? 'aspect-[4/5]' : 'aspect-square',
       ]"
     >
-      <NuxtLink :to="`/products/${product.slug}`" class="block h-full w-full">
+      <NuxtLink :to="`/products/${product.slug}`" class="block h-full w-full" draggable="false">
         <img
           :src="getProductImage(product.image)"
           :alt="product.name"
-          class="h-full w-full object-cover"
+          class="pointer-events-none h-full w-full object-cover"
           loading="lazy"
           draggable="false"
         />
@@ -171,6 +171,7 @@ async function handleDecrease(event: Event) {
       <NuxtLink
         :to="`/products/${product.slug}`"
         :class="isCompact ? 'block h-[1.85rem] shrink-0' : 'block h-[2.6rem] shrink-0'"
+        draggable="false"
       >
         <h3
           :class="[

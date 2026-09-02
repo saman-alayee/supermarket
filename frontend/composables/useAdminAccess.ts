@@ -16,6 +16,7 @@ const PATH_PERMISSIONS: Array<{ prefix: string; permission: PanelPermission }> =
   { prefix: '/admin/categories', permission: 'categories' },
   { prefix: '/admin/tags', permission: 'tags' },
   { prefix: '/admin/sliders', permission: 'sliders' },
+  { prefix: '/admin/home-picks', permission: 'products' },
   { prefix: '/admin/products', permission: 'products' },
   { prefix: '/admin/orders', permission: 'orders' },
   { prefix: '/admin', permission: 'dashboard' },

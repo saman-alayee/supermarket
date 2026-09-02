@@ -33,6 +33,7 @@ const sizeClasses = {
   <NuxtLink
     :to="`/categories/${category.slug}`"
     :class="['flex flex-col items-center gap-1.5 cursor-pointer group shrink-0', sizeClasses[size].wrap]"
+    draggable="false"
   >
     <div
       :class="[
@@ -45,7 +46,8 @@ const sizeClasses = {
         v-if="category.image"
         :src="getCategoryImage(category.image)"
         :alt="category.name"
-        class="w-full h-full object-cover"
+        class="pointer-events-none h-full w-full object-cover"
+        draggable="false"
       />
       <span v-else class="w-full h-full flex items-center justify-center bg-gray-50 text-3xl">🛒</span>
     </div>

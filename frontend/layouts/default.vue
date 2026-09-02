@@ -21,9 +21,9 @@ watch(
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="min-h-screen flex min-w-0 flex-col overflow-x-clip">
     <AppHeader />
-    <main class="flex-1 safe-bottom">
+    <main class="min-w-0 flex-1 safe-bottom">
       <slot />
     </main>
     <FloatingCart />

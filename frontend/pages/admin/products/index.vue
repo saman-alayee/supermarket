@@ -43,6 +43,8 @@ const form = reactive({
   isFeatured: false,
   isNew: false,
   isOldPrice: false,
+  isHomeDeal: false,
+  isHomeFeatured: false,
   isActive: true,
 });
 
@@ -188,6 +190,8 @@ function openForm(product?: Product) {
       isFeatured: product.isFeatured,
       isNew: product.isNew,
       isOldPrice: product.isOldPrice ?? false,
+      isHomeDeal: product.isHomeDeal ?? false,
+      isHomeFeatured: product.isHomeFeatured ?? false,
       isActive: product.isActive,
     });
   } else {
@@ -209,6 +213,8 @@ function openForm(product?: Product) {
       isFeatured: false,
       isNew: false,
       isOldPrice: false,
+      isHomeDeal: false,
+      isHomeFeatured: false,
       isActive: true,
     });
   }
@@ -286,7 +292,12 @@ useHead({ title: 'محصولات - پنل مدیریت' });
 
 <template>
   <div>
-    <h1 class="text-xl font-bold text-gray-800 mb-6">مدیریت محصولات</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 class="text-xl font-bold text-gray-800">مدیریت محصولات</h1>
+      <NuxtLink to="/admin/home-picks" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+        انتخاب محصولات صفحه اول
+      </NuxtLink>
+    </div>
     <div class="flex flex-col md:flex-row gap-3 mb-4 flex-wrap">
       <input
         v-model="search"
@@ -531,6 +542,8 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             <label class="block text-sm font-medium text-gray-700 mb-2">وضعیت نمایش</label>
             <div class="flex flex-wrap gap-2">
               <AppToggleChip v-model="form.isFeatured" label="ویژه" icon="lucide:sparkles" />
+              <AppToggleChip v-model="form.isHomeDeal" label="تخفیف‌دار صفحه اول" icon="lucide:percent" />
+              <AppToggleChip v-model="form.isHomeFeatured" label="ویژه صفحه اول" icon="lucide:house" />
               <AppToggleChip v-model="form.isNew" label="جدید" icon="lucide:badge-plus" />
               <AppToggleChip v-model="form.isOldPrice" label="قیمت قدیم" icon="lucide:badge-alert" />
               <AppToggleChip v-model="form.isActive" label="فعال" icon="lucide:eye" />

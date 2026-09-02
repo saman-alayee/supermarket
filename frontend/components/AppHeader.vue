@@ -88,19 +88,21 @@ function handleSearch() {
         </form>
       </div>
 
-      <nav class="md:hidden flex gap-2 overflow-x-auto scrollbar-hide pb-2.5 text-xs font-medium">
-        <NuxtLink to="/search?discounted=1" class="shrink-0 px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-100">
-          تخفیف‌دار
-        </NuxtLink>
-        <NuxtLink to="/search?featured=1" class="shrink-0 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 border border-primary-100">
-          پیشنهاد ویژه
-        </NuxtLink>
-        <NuxtLink to="/categories" class="shrink-0 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
-          دسته‌بندی‌ها
-        </NuxtLink>
-        <NuxtLink to="/contact" class="shrink-0 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
-          تماس با ما
-        </NuxtLink>
+      <nav class="md:hidden min-w-0" aria-label="میانبرها">
+        <ChipStrip class="pb-2.5 text-xs font-medium">
+          <NuxtLink to="/search?discounted=1" class="px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-100">
+            تخفیف‌دار
+          </NuxtLink>
+          <NuxtLink to="/search?featured=1" class="px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 border border-primary-100">
+            پیشنهاد ویژه
+          </NuxtLink>
+          <NuxtLink to="/categories" class="px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
+            دسته‌بندی‌ها
+          </NuxtLink>
+          <NuxtLink to="/contact" class="px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-100">
+            تماس با ما
+          </NuxtLink>
+        </ChipStrip>
       </nav>
 
       <nav class="hidden md:flex items-center gap-6 pb-3 text-sm text-gray-600">

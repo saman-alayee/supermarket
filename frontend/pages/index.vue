@@ -86,12 +86,16 @@ async function loadHomeSections() {
   sectionsLoading.value = true;
   try {
     const [featuredRes, discountedRes, feedRes] = await Promise.all([
-      api.get<{ products: Product[] }>('/products?featured=true&limit=10').catch(() => ({ data: { products: [] } })),
-      api.get<{ products: Product[] }>('/products?discounted=true&limit=10').catch(() => ({ data: { products: [] } })),
+      api.get<{ products: Product[] }>('/products?homeFeatured=true&limit=10').catch(() => ({ data: { products: [] } })),
+      api.get<{ products: Product[] }>('/products?homeDeal=true&limit=10').catch(() => ({ data: { products: [] } })),
       api.get<HomeCategorySection[]>('/products/home-feed').catch(() => ({ data: [] as HomeCategorySection[] })),
     ]);
     featuredProducts.value = featuredRes.data.products;
     discountedProducts.value = discountedRes.data.products;
+    if (!featuredProducts.value.length) {
+      const fallback = await api.get<{ products: Product[] }>('/products?featured=true&limit=10').catch(() => ({ data: { products: [] } }));
+      featuredProducts.value = fallback.data.products;
+    }
     categorySections.value = feedRes.data;
   } finally {
     sectionsLoading.value = false;
@@ -137,7 +141,7 @@ useHead({ title: `${SITE_NAME} - فروشگاه اینترنتی` });
 
     <!-- Quick shortcuts -->
     <section class="px-4 pt-3 pb-1">
-      <div class="flex gap-2 overflow-x-auto scrollbar-hide">
+      <ChipStrip>
         <NuxtLink
           to="/search?discounted=1"
           class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-50 text-red-700 text-xs font-semibold border border-red-100"
@@ -166,7 +170,7 @@ useHead({ title: `${SITE_NAME} - فروشگاه اینترنتی` });
           <AppIcon name="lucide:package-search" size="sm" />
           پیگیری سفارش
         </NuxtLink>
-      </div>
+      </ChipStrip>
     </section>
 
     <!-- Categories: single-row horizontal slider -->

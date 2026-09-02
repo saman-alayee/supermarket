@@ -27,6 +27,7 @@ const quickLinks = [
   { to: '/admin/orders?status=NEW', label: 'سفارش‌های جدید', desc: 'بررسی و تأیید', icon: 'lucide:inbox' },
   { to: '/admin/orders?status=PREPARING', label: 'در حال آماده‌سازی', desc: 'آماده برای ارسال', icon: 'lucide:chef-hat' },
   { to: '/admin/products', label: 'محصولات', desc: 'افزودن و ویرایش کالا', icon: 'lucide:shopping-basket' },
+  { to: '/admin/home-picks', label: 'صفحه اول', desc: 'انتخاب دستی تخفیف‌دار و ویژه', icon: 'lucide:sparkles' },
   { to: '/admin/sales', label: 'گزارش فروش', desc: 'بازه تاریخ و کالا', icon: 'lucide:bar-chart-3' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', desc: 'مدیریت پرومو', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران و دسترسی', desc: 'مدیر، مسئول، پرسنل', icon: 'lucide:users' },

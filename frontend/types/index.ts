@@ -158,6 +158,8 @@ export interface Product {
   isFeatured: boolean;
   isNew: boolean;
   isOldPrice: boolean;
+  isHomeDeal?: boolean;
+  isHomeFeatured?: boolean;
   categoryId: string;
   tagId?: string | null;
   category?: { id: string; name: string; slug: string };
