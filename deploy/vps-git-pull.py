@@ -47,7 +47,7 @@ def main() -> int:
         transport.set_keepalive(15)
     print("Connected. Pulling and building on VPS...", flush=True)
 
-    _, stdout, stderr = client.exec_command(REMOTE, timeout=1200)
+    _, stdout, stderr = client.exec_command(REMOTE, timeout=3600)
     while True:
         if stdout.channel.recv_ready():
             print(stdout.channel.recv(65536).decode("utf-8", "replace"), end="", flush=True)
