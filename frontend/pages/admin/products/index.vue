@@ -36,8 +36,8 @@ const form = reactive({
   discountPrice: null as number | null,
   stock: 0,
   unit: '',
-  categoryId: '',
-  tagId: '' as string | null,
+  categoryIds: [] as string[],
+  tagIds: [] as string[],
   image: null as string | null,
   images: [] as string[],
   isFeatured: false,
@@ -48,14 +48,30 @@ const form = reactive({
   isActive: true,
 });
 
-const tagOptions = computed(() =>
-  tags.value
-    .filter((tag) => !form.categoryId || tag.categoryId === form.categoryId)
-    .map((tag) => ({
-      value: tag.id,
-      label: tag.name,
-      icon: 'lucide:tag',
-    }))
+const tagOptions = computed(() => {
+  const selectedCategories = new Set(form.categoryIds);
+  return tags.value
+    .filter((tag) => !selectedCategories.size || selectedCategories.has(tag.categoryId))
+    .map((tag) => {
+      const category = categories.value.find((item) => item.id === tag.categoryId);
+      const showCategory = form.categoryIds.length > 1 && category;
+      return {
+        value: tag.id,
+        label: showCategory ? `${tag.name} (${category.name})` : tag.name,
+        icon: 'lucide:tag',
+      };
+    });
+});
+
+watch(
+  () => form.categoryIds.slice(),
+  (categoryIds) => {
+    const allowed = new Set(categoryIds);
+    form.tagIds = form.tagIds.filter((tagId) => {
+      const tag = tags.value.find((item) => item.id === tagId);
+      return tag ? allowed.has(tag.categoryId) : false;
+    });
+  }
 );
 
 const categoryOptions = computed(() =>
@@ -183,8 +199,16 @@ function openForm(product?: Product) {
       discountPrice: product.discountPrice,
       stock: product.stock,
       unit: product.unit || '',
-      categoryId: product.categoryId,
-      tagId: product.tagId || '',
+      categoryIds: product.categoryIds?.length
+        ? [...product.categoryIds]
+        : product.categoryId
+          ? [product.categoryId]
+          : [],
+      tagIds: product.tagIds?.length
+        ? [...product.tagIds]
+        : product.tagId
+          ? [product.tagId]
+          : [],
       image: product.image,
       images: product.images?.length ? [...product.images] : product.image ? [product.image] : [],
       isFeatured: product.isFeatured,
@@ -206,8 +230,8 @@ function openForm(product?: Product) {
       discountPrice: null,
       stock: 0,
       unit: '',
-      categoryId: categories.value[0]?.id || '',
-      tagId: '',
+      categoryIds: categories.value[0]?.id ? [categories.value[0].id] : [],
+      tagIds: [],
       image: null,
       images: [],
       isFeatured: false,
@@ -227,7 +251,10 @@ async function save() {
     barcode: form.barcode.trim() || null,
     productionDate: form.productionDate || null,
     expiryDate: form.expiryDate || null,
-    tagId: form.tagId || null,
+    categoryIds: form.categoryIds,
+    tagIds: form.tagIds,
+    categoryId: form.categoryIds[0] ?? null,
+    tagId: form.tagIds[0] ?? null,
     image: form.images[0] ?? form.image,
     images: form.images,
   };
@@ -519,19 +546,19 @@ useHead({ title: 'محصولات - پنل مدیریت' });
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">دسته‌بندی</label>
-            <AppSelect
-              v-model="form.categoryId"
+            <label class="block text-sm font-medium text-gray-700 mb-1">دسته‌بندی‌ها</label>
+            <AppMultiSelect
+              v-model="form.categoryIds"
               :options="categoryOptions"
-              placeholder="دسته‌بندی را انتخاب کنید"
+              placeholder="یک یا چند دسته‌بندی انتخاب کنید"
               searchable
               required
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">برچسب</label>
-            <AppSelect
-              v-model="form.tagId"
+            <label class="block text-sm font-medium text-gray-700 mb-1">برچسب‌ها</label>
+            <AppMultiSelect
+              v-model="form.tagIds"
               :options="tagOptions"
               placeholder="برچسب (اختیاری)"
               searchable

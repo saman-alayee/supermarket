@@ -85,6 +85,7 @@ export class TagService {
   }
 
   async delete(id: string) {
+    await prisma.productTag.deleteMany({ where: { tagId: id } });
     await prisma.product.updateMany({ where: { tagId: id }, data: { tagId: null } });
     await prisma.tag.delete({ where: { id } });
     await cacheDel('tags:*');

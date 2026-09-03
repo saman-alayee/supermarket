@@ -231,7 +231,7 @@ async function loadTagProducts(tagSlug: string, nextPage = 1, append = false) {
   );
 
   if (tagSlug === 'other') {
-    const batch = data.products.filter((product) => !product.tagId);
+    const batch = data.products.filter((product) => !(product.tagIds?.length || product.tagId));
     tagProducts.value = append ? [...tagProducts.value, ...batch] : batch;
     listPagination.value = data.pagination;
   } else {
@@ -404,9 +404,14 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
             <span v-if="section.tag?.icon">{{ section.tag.icon }}</span>
             {{ section.tag?.name || 'سایر محصولات' }}
           </h2>
-          <span v-if="section.total > section.products.length" class="text-xs text-gray-400">
-            {{ section.products.length }} از {{ section.total }}
-          </span>
+          <button
+            v-if="section.tag?.slug && section.total > section.products.length"
+            type="button"
+            class="text-xs text-primary-600 font-medium shrink-0"
+            @click="selectTag(section.tag.slug)"
+          >
+            ادامه
+          </button>
         </div>
 
         <ProductCardList

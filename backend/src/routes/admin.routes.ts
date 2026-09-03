@@ -116,7 +116,7 @@ router.post(
 );
 
 // Products
-const productSchema = z.object({
+const productBaseSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   barcode: z.string().optional().nullable(),
@@ -128,8 +128,10 @@ const productSchema = z.object({
   image: z.string().optional().nullable(),
   images: z.array(z.string()).optional(),
   unit: z.string().optional(),
-  categoryId: z.string(),
+  categoryId: z.string().optional(),
+  categoryIds: z.array(z.string()).min(1).optional(),
   tagId: z.string().optional().nullable(),
+  tagIds: z.array(z.string()).optional(),
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
   isOldPrice: z.boolean().optional(),
@@ -137,6 +139,14 @@ const productSchema = z.object({
   isHomeFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
+
+const productSchema = productBaseSchema.refine(
+  (data) => (data.categoryIds?.length ?? 0) > 0 || Boolean(data.categoryId),
+  {
+    message: 'حداقل یک دسته‌بندی لازم است',
+    path: ['categoryIds'],
+  }
+);
 
 router.get(
   '/products',
@@ -189,7 +199,7 @@ router.post(
 
 router.put(
   '/products/:id',
-  validate(productSchema.partial()),
+  validate(productBaseSchema.partial()),
   asyncHandler(async (req, res) => {
     const product = await productService.update(paramId(req.params.id), req.body);
     successResponse(res, product, 'محصول به‌روزرسانی شد');

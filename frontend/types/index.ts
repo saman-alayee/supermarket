@@ -162,6 +162,10 @@ export interface Product {
   isHomeFeatured?: boolean;
   categoryId: string;
   tagId?: string | null;
+  categoryIds?: string[];
+  tagIds?: string[];
+  categories?: Array<{ id: string; name: string; slug: string }>;
+  tags?: Tag[];
   category?: { id: string; name: string; slug: string };
   tag?: Tag | null;
   inStock: boolean;

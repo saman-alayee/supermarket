@@ -26,8 +26,32 @@ interface ProductFilters {
 const productInclude = {
   category: { select: { id: true, name: true, slug: true } },
   tag: { select: { id: true, name: true, slug: true, icon: true } },
+  productCategories: {
+    include: { category: { select: { id: true, name: true, slug: true } } },
+  },
+  productTags: {
+    include: {
+      tag: { select: { id: true, name: true, slug: true, icon: true, categoryId: true } },
+    },
+  },
   images: { orderBy: { sortOrder: 'asc' as const } },
 };
+
+function uniqueIds(ids?: Array<string | null | undefined>) {
+  return [...new Set((ids ?? []).map((id) => id?.trim()).filter(Boolean))] as string[];
+}
+
+function categoryFilter(categoryId: string) {
+  return {
+    OR: [{ categoryId }, { productCategories: { some: { categoryId } } }],
+  };
+}
+
+function tagFilter(tagId: string) {
+  return {
+    OR: [{ tagId }, { productTags: { some: { tagId } } }],
+  };
+}
 
 function textContains(value: string) {
   return { contains: value };
@@ -62,13 +86,21 @@ export class ProductService {
     } = filters;
 
     const where: Record<string, unknown> = {};
+    const andFilters: Record<string, unknown>[] = [];
 
     if (!includeInactive) where.isActive = true;
-    if (categoryId) where.categoryId = categoryId;
-    if (tagId) where.tagId = tagId;
+    if (categoryId) andFilters.push(categoryFilter(categoryId));
+    if (tagId) andFilters.push(tagFilter(tagId));
+    if (andFilters.length) where.AND = andFilters;
     if (ids?.length) where.id = { in: ids };
     if (categorySlug) {
-      where.category = { slug: categorySlug };
+      andFilters.push({
+        OR: [
+          { category: { slug: categorySlug } },
+          { productCategories: { some: { category: { slug: categorySlug } } } },
+        ],
+      });
+      where.AND = andFilters;
     }
     if (featured) where.isFeatured = true;
     if (isNew) where.isNew = true;
@@ -98,6 +130,8 @@ export class ProductService {
           { barcode: textContains(term) },
           { category: { name: textContains(term) } },
           { tag: { name: textContains(term) } },
+          { productCategories: { some: { category: { name: textContains(term) } } } },
+          { productTags: { some: { tag: { name: textContains(term) } } } },
         ]);
       }
     }
@@ -169,21 +203,27 @@ export class ProductService {
     image?: string | null;
     images?: string[];
     unit?: string;
-    categoryId: string;
+    categoryId?: string;
+    categoryIds?: string[];
     tagId?: string | null;
+    tagIds?: string[];
     isFeatured?: boolean;
     isNew?: boolean;
     isOldPrice?: boolean;
     isHomeDeal?: boolean;
     isHomeFeatured?: boolean;
   }) {
-    const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
+    const { images, image, productionDate, expiryDate, barcode, categoryIds, tagIds, ...rest } = data;
     const imageList = normalizeImages(images, image);
     const slug = slugify(data.name) + '-' + Date.now().toString(36);
+    const resolvedCategoryIds = this.resolveCategoryIds(categoryIds, rest.categoryId);
+    const resolvedTagIds = this.resolveTagIds(tagIds, rest.tagId);
 
     const product = await prisma.product.create({
       data: {
         ...rest,
+        categoryId: resolvedCategoryIds[0],
+        tagId: resolvedTagIds[0] ?? null,
         barcode: barcode?.trim() || null,
         productionDate: productionDate ? new Date(productionDate) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
@@ -196,14 +236,34 @@ export class ProductService {
       include: productInclude,
     });
 
+    await this.syncProductAssociations(product.id, resolvedCategoryIds, resolvedTagIds);
+
     await cacheDel('products:*');
     await cacheDel('home:*');
-    return this.formatProduct(product);
+    return this.formatProduct(
+      await prisma.product.findUniqueOrThrow({ where: { id: product.id }, include: productInclude })
+    );
   }
 
   async update(id: string, data: Record<string, unknown>) {
-    const { images, image, productionDate, expiryDate, barcode, ...rest } = data;
+    const { images, image, productionDate, expiryDate, barcode, categoryIds, tagIds, ...rest } = data;
     const updateData: Record<string, unknown> = { ...rest };
+
+    const hasCategoryIds = categoryIds !== undefined || rest.categoryId !== undefined;
+    const hasTagIds = tagIds !== undefined || rest.tagId !== undefined;
+    const resolvedCategoryIds = hasCategoryIds
+      ? this.resolveCategoryIds(categoryIds as string[] | undefined, rest.categoryId as string | undefined)
+      : undefined;
+    const resolvedTagIds = hasTagIds
+      ? this.resolveTagIds(tagIds as string[] | undefined, rest.tagId as string | null | undefined)
+      : undefined;
+
+    if (resolvedCategoryIds !== undefined) {
+      updateData.categoryId = resolvedCategoryIds[0];
+    }
+    if (resolvedTagIds !== undefined) {
+      updateData.tagId = resolvedTagIds[0] ?? null;
+    }
 
     if (barcode !== undefined) {
       updateData.barcode = typeof barcode === 'string' && barcode.trim() ? barcode.trim() : null;
@@ -237,9 +297,19 @@ export class ProductService {
       include: productInclude,
     });
 
+    if (resolvedCategoryIds !== undefined || resolvedTagIds !== undefined) {
+      await this.syncProductAssociations(
+        id,
+        resolvedCategoryIds ?? (await this.getProductCategoryIds(id)),
+        resolvedTagIds ?? (await this.getProductTagIds(id))
+      );
+    }
+
     await cacheDel('products:*');
     await cacheDel('home:*');
-    return this.formatProduct(product);
+    return this.formatProduct(
+      await prisma.product.findUniqueOrThrow({ where: { id }, include: productInclude })
+    );
   }
 
   async delete(id: string) {
@@ -402,10 +472,15 @@ export class ProductService {
 
     const rankedRows = await prisma.$queryRaw<Array<{ id: string; categoryId: string }>>(Prisma.sql`
       SELECT id, categoryId FROM (
-        SELECT id, categoryId,
-          ROW_NUMBER() OVER (PARTITION BY categoryId ORDER BY createdAt DESC) AS rn
-        FROM products
-        WHERE isActive = true AND categoryId IN (${Prisma.join(categoryIds)})
+        SELECT p.id, link.categoryId,
+          ROW_NUMBER() OVER (PARTITION BY link.categoryId ORDER BY p.createdAt DESC) AS rn
+        FROM products p
+        INNER JOIN (
+          SELECT id AS productId, categoryId FROM products WHERE categoryId IN (${Prisma.join(categoryIds)})
+          UNION
+          SELECT productId, categoryId FROM product_categories WHERE categoryId IN (${Prisma.join(categoryIds)})
+        ) link ON link.productId = p.id
+        WHERE p.isActive = true
       ) ranked
       WHERE rn <= 10
     `);
@@ -464,7 +539,7 @@ export class ProductService {
 
     const groups = await Promise.all(
       tags.map(async (tag) => {
-        const where = { tagId: tag.id, isActive: true };
+        const where = { isActive: true, ...tagFilter(tag.id) };
         const [products, total] = await Promise.all([
           prisma.product.findMany({
             where,
@@ -482,7 +557,14 @@ export class ProductService {
       })
     );
 
-    const untaggedWhere = { categoryId: category.id, tagId: null, isActive: true };
+    const untaggedWhere = {
+      isActive: true,
+      AND: [
+        categoryFilter(category.id),
+        { tagId: null },
+        { productTags: { none: {} } },
+      ],
+    };
     const [untagged, untaggedTotal] = await Promise.all([
       prisma.product.findMany({
         where: untaggedWhere,
@@ -526,9 +608,12 @@ export class ProductService {
     };
 
     if (product.tagId) {
-      where.tagId = product.tagId;
+      where.OR = [
+        { tagId: product.tagId },
+        { productTags: { some: { tagId: product.tagId } } },
+      ];
     } else {
-      where.categoryId = product.categoryId;
+      Object.assign(where, categoryFilter(product.categoryId));
     }
 
     const related = await prisma.product.findMany({
@@ -553,6 +638,69 @@ export class ProductService {
 
   formatProductPublic(product: Parameters<ProductService['formatProduct']>[0]) {
     return this.formatProduct(product);
+  }
+
+  private resolveCategoryIds(categoryIds?: string[], categoryId?: string) {
+    const resolved = uniqueIds(categoryIds?.length ? categoryIds : categoryId ? [categoryId] : []);
+    if (!resolved.length) {
+      throw new AppError(400, 'حداقل یک دسته‌بندی لازم است');
+    }
+    return resolved;
+  }
+
+  private resolveTagIds(tagIds?: string[], tagId?: string | null) {
+    return uniqueIds(tagIds?.length ? tagIds : tagId ? [tagId] : []);
+  }
+
+  private async getProductCategoryIds(productId: string) {
+    const rows = await prisma.productCategory.findMany({
+      where: { productId },
+      select: { categoryId: true },
+    });
+    return rows.map((row) => row.categoryId);
+  }
+
+  private async getProductTagIds(productId: string) {
+    const rows = await prisma.productTag.findMany({
+      where: { productId },
+      select: { tagId: true },
+    });
+    return rows.map((row) => row.tagId);
+  }
+
+  private async syncProductAssociations(
+    productId: string,
+    categoryIds: string[],
+    tagIds: string[]
+  ) {
+    const uniqueCategoryIds = uniqueIds(categoryIds);
+    const uniqueTagIds = uniqueIds(tagIds);
+
+    if (!uniqueCategoryIds.length) {
+      throw new AppError(400, 'حداقل یک دسته‌بندی لازم است');
+    }
+
+    await prisma.$transaction([
+      prisma.productCategory.deleteMany({ where: { productId } }),
+      prisma.productTag.deleteMany({ where: { productId } }),
+      prisma.productCategory.createMany({
+        data: uniqueCategoryIds.map((categoryId) => ({ productId, categoryId })),
+      }),
+      ...(uniqueTagIds.length
+        ? [
+            prisma.productTag.createMany({
+              data: uniqueTagIds.map((tagId) => ({ productId, tagId })),
+            }),
+          ]
+        : []),
+      prisma.product.update({
+        where: { id: productId },
+        data: {
+          categoryId: uniqueCategoryIds[0],
+          tagId: uniqueTagIds[0] ?? null,
+        },
+      }),
+    ]);
   }
 
   private formatProduct(product: {
@@ -580,6 +728,10 @@ export class ProductService {
     tagId?: string | null;
     category?: { id: string; name: string; slug: string };
     tag?: { id: string; name: string; slug: string; icon: string | null } | null;
+    productCategories?: Array<{ category: { id: string; name: string; slug: string } }>;
+    productTags?: Array<{
+      tag: { id: string; name: string; slug: string; icon: string | null; categoryId: string };
+    }>;
     images?: { url: string; sortOrder: number }[];
     createdAt: Date;
     updatedAt: Date;
@@ -592,9 +744,21 @@ export class ProductService {
     const imageUrls = product.images?.map((item) => item.url) ?? [];
     const images = imageUrls.length ? imageUrls : product.image ? [product.image] : [];
     const primaryImage = images[0] ?? null;
+    const categories =
+      product.productCategories?.map((item) => item.category) ??
+      (product.category ? [product.category] : []);
+    const tags =
+      product.productTags?.map((item) => item.tag) ??
+      (product.tag ? [product.tag] : []);
+    const categoryIds = categories.map((item) => item.id);
+    const tagIds = tags.map((item) => item.id);
+    const primaryCategory = categories[0] ?? product.category ?? null;
+    const primaryTag = tags[0] ?? product.tag ?? null;
+
+    const { productCategories, productTags, category, tag, ...restProduct } = product;
 
     return {
-      ...product,
+      ...restProduct,
       image: primaryImage,
       images,
       price,
@@ -602,6 +766,14 @@ export class ProductService {
       effectivePrice,
       discountPercent,
       inStock: product.stock > 0,
+      categories,
+      tags,
+      categoryIds,
+      tagIds,
+      category: primaryCategory,
+      tag: primaryTag,
+      categoryId: primaryCategory?.id ?? product.categoryId,
+      tagId: primaryTag?.id ?? product.tagId ?? null,
     };
   }
 }

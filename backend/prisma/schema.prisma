@@ -126,11 +126,25 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  products Product[]
-  tags     Tag[]
-  sliders  Slider[]
+  products          Product[]
+  productCategories ProductCategory[]
+  tags              Tag[]
+  sliders           Slider[]
 
   @@map("categories")
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@map("product_categories")
 }
 
 model Tag {
@@ -143,12 +157,26 @@ model Tag {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  category Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  products Product[]
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products     Product[]
+  productTags  ProductTag[]
 
   @@unique([categoryId, slug])
   @@index([categoryId, sortOrder])
   @@map("tags")
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@index([tagId])
+  @@map("product_tags")
 }
 
 model Product {
@@ -177,9 +205,11 @@ model Product {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  category   Category       @relation(fields: [categoryId], references: [id])
-  tag        Tag?           @relation(fields: [tagId], references: [id], onDelete: SetNull)
-  cartItems  CartItem[]
+  category         Category          @relation(fields: [categoryId], references: [id])
+  tag              Tag?              @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  productCategories ProductCategory[]
+  productTags       ProductTag[]
+  cartItems        CartItem[]
   orderItems OrderItem[]
   discounts  Discount[]
   images     ProductImage[]

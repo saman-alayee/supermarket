@@ -49,6 +49,7 @@ chmod 600 .env
 npm ci --omit=dev
 npx prisma generate
 npx prisma db push --accept-data-loss
+npx tsx scripts/backfill-product-associations.ts 2>/dev/null || node -e "console.log('BACKFILL_SKIP')"
 
 node <<'NODE'
 const { PrismaClient } = require('@prisma/client');

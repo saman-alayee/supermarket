@@ -43,8 +43,11 @@ export class CategoryService {
   }
 
   async delete(id: string) {
-    const productCount = await prisma.product.count({ where: { categoryId: id } });
-    if (productCount > 0) {
+    const [primaryCount, linkedCount] = await Promise.all([
+      prisma.product.count({ where: { categoryId: id } }),
+      prisma.productCategory.count({ where: { categoryId: id } }),
+    ]);
+    if (primaryCount > 0 || linkedCount > 0) {
       throw new AppError(400, 'این دسته‌بندی دارای محصول است و قابل حذف نیست');
     }
     await prisma.category.delete({ where: { id } });
