@@ -42,7 +42,7 @@ const { sentinel: loadMoreSentinel } = useHorizontalInfiniteScroll(
 function updateScrollState() {
   const el = stripRef.value;
   if (!el) return;
-  const maxScroll = el.scrollWidth - el.clientWidth;
+  const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
   canScrollPrev.value = el.scrollLeft > 2;
   canScrollNext.value = maxScroll > 2 && el.scrollLeft < maxScroll - 2;
 }
@@ -51,10 +51,8 @@ function scrollStrip(direction: 'prev' | 'next') {
   const el = stripRef.value;
   if (!el) return;
   const step = Math.max(el.clientWidth * 0.72, 176);
-  el.scrollBy({
-    left: direction === 'next' ? step : -step,
-    behavior: 'smooth',
-  });
+  const delta = direction === 'next' ? step : -step;
+  el.scrollBy({ left: delta, behavior: 'smooth' });
 }
 
 let resizeObserver: ResizeObserver | null = null;
@@ -100,28 +98,27 @@ watch(
 </script>
 
 <template>
-  <div v-if="layout === 'strip'" class="relative min-w-0 w-full">
+  <div v-if="layout === 'strip'" class="relative min-w-0 w-full product-card-strip-shell">
     <button
-      v-if="canScrollPrev"
+      v-show="canScrollPrev"
       type="button"
-      class="absolute top-[38%] start-0 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 bg-white/95 text-gray-700 shadow-md"
+      class="product-card-strip-nav product-card-strip-nav-prev"
       aria-label="محصولات قبلی"
       @click="scrollStrip('prev')"
     >
       <AppIcon name="lucide:chevron-right" size="sm" />
     </button>
     <button
-      v-if="canScrollNext"
+      v-show="canScrollNext"
       type="button"
-      class="absolute top-[38%] end-0 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-gray-100 bg-white/95 text-gray-700 shadow-md"
+      class="product-card-strip-nav product-card-strip-nav-next"
       aria-label="محصولات بعدی"
       @click="scrollStrip('next')"
     >
       <AppIcon name="lucide:chevron-left" size="sm" />
     </button>
 
-    <!-- RTL: first product starts from the right on Persian layout -->
-    <div ref="stripRef" dir="rtl" :class="stripClass">
+    <div ref="stripRef" :class="stripClass">
       <div v-for="product in products" :key="product.id" :class="slotClass">
         <ProductCard :product="product" :size="cardSize" class="h-full" />
       </div>

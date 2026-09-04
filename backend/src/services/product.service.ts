@@ -1,5 +1,5 @@
 import prisma from '../config/database';
-import { Prisma } from '@prisma/client';
+import { Prisma, CategoryFeedSortMode } from '@prisma/client';
 import { cacheGet, cacheSet, cacheDel } from '../config/redis';
 import { AppError } from '../utils/errors';
 import { slugify } from '../utils/helpers';
@@ -388,6 +388,88 @@ export class ProductService {
     return this.getHomePicks();
   }
 
+  async getCategoryFeedPicks(categoryId: string) {
+    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category) throw new AppError(404, 'دسته‌بندی یافت نشد');
+
+    const picks = await prisma.categoryFeedProduct.findMany({
+      where: { categoryId },
+      orderBy: { sortOrder: 'asc' },
+      include: { product: { include: productInclude } },
+    });
+
+    return {
+      category: {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+      },
+      feedSortMode: category.feedSortMode,
+      products: picks
+        .filter((row) => row.product.isActive)
+        .map((row) => this.formatProduct(row.product)),
+    };
+  }
+
+  async setCategoryFeedPicks(
+    categoryId: string,
+    data: { feedSortMode?: CategoryFeedSortMode; productIds?: string[] }
+  ) {
+    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category) throw new AppError(404, 'دسته‌بندی یافت نشد');
+
+    const productIds =
+      data.productIds !== undefined ? this.normalizeHomePickIds(data.productIds) : undefined;
+
+    if (productIds !== undefined) {
+      await this.assertProductsInCategory(categoryId, productIds);
+    }
+
+    const operations: Prisma.PrismaPromise<unknown>[] = [];
+
+    if (data.feedSortMode !== undefined) {
+      operations.push(
+        prisma.category.update({
+          where: { id: categoryId },
+          data: { feedSortMode: data.feedSortMode },
+        })
+      );
+    }
+
+    if (productIds !== undefined) {
+      operations.push(prisma.categoryFeedProduct.deleteMany({ where: { categoryId } }));
+      productIds.forEach((productId, index) => {
+        operations.push(
+          prisma.categoryFeedProduct.create({
+            data: { categoryId, productId, sortOrder: index },
+          })
+        );
+      });
+    }
+
+    if (operations.length) {
+      await prisma.$transaction(operations);
+    }
+
+    await cacheDel('home:*');
+    await cacheDel('categories:*');
+    return this.getCategoryFeedPicks(categoryId);
+  }
+
+  private async assertProductsInCategory(categoryId: string, productIds: string[]) {
+    if (!productIds.length) return;
+    const count = await prisma.product.count({
+      where: {
+        id: { in: productIds },
+        isActive: true,
+        ...categoryFilter(categoryId),
+      },
+    });
+    if (count !== productIds.length) {
+      throw new AppError(400, 'برخی محصولات به این دسته‌بندی تعلق ندارند');
+    }
+  }
+
   private normalizeHomePickIds(ids?: string[]) {
     const unique = [...new Set((ids ?? []).map((id) => id.trim()).filter(Boolean))];
     if (unique.length > 10) {
@@ -470,6 +552,12 @@ export class ProductService {
       return [];
     }
 
+    const feedPickRows = await prisma.categoryFeedProduct.findMany({
+      where: { categoryId: { in: categoryIds } },
+      orderBy: { sortOrder: 'asc' },
+      select: { categoryId: true, productId: true, sortOrder: true },
+    });
+
     const rankedRows = await prisma.$queryRaw<Array<{ id: string; categoryId: string }>>(Prisma.sql`
       SELECT id, categoryId FROM (
         SELECT p.id, link.categoryId,
@@ -485,19 +573,28 @@ export class ProductService {
       WHERE rn <= 10
     `);
 
-    const productIds = rankedRows.map((row) => row.id);
+    const productIds = [
+      ...new Set([...rankedRows.map((row) => row.id), ...feedPickRows.map((row) => row.productId)]),
+    ];
     if (productIds.length === 0) {
       await cacheSet(cacheKey, [], 300);
       return [];
     }
 
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, isActive: true },
       include: productInclude,
     });
 
     const productById = new Map(products.map((product) => [product.id, product]));
     const productsByCategory = new Map<string, ReturnType<typeof this.formatProduct>[]>();
+    const pickIdsByCategory = new Map<string, string[]>();
+
+    for (const row of feedPickRows) {
+      const list = pickIdsByCategory.get(row.categoryId) ?? [];
+      list.push(row.productId);
+      pickIdsByCategory.set(row.categoryId, list);
+    }
 
     for (const row of rankedRows) {
       const product = productById.get(row.id);
@@ -509,7 +606,13 @@ export class ProductService {
 
     const feed = categories
       .map((category) => {
-        const formatted = productsByCategory.get(category.id) ?? [];
+        const pool = productsByCategory.get(category.id) ?? [];
+        const products = this.orderCategoryFeedProducts(
+          category.feedSortMode,
+          pool,
+          pickIdsByCategory.get(category.id) ?? [],
+          productById
+        );
         return {
           category: {
             id: category.id,
@@ -517,7 +620,7 @@ export class ProductService {
             slug: category.slug,
             image: category.image,
           },
-          products: this.sortByDiscountPercent(formatted),
+          products,
         };
       })
       .filter((section) => section.products.length > 0);
@@ -624,6 +727,31 @@ export class ProductService {
     });
 
     return this.sortByDiscountPercent(related.map((p) => this.formatProduct(p)));
+  }
+
+  private orderCategoryFeedProducts(
+    mode: CategoryFeedSortMode,
+    pool: ReturnType<typeof this.formatProduct>[],
+    pickIds: string[],
+    productById: Map<string, Parameters<ProductService['formatProduct']>[0]>
+  ) {
+    const limit = 10;
+
+    if (mode === CategoryFeedSortMode.MANUAL && pickIds.length > 0) {
+      const picked = pickIds
+        .map((id) => productById.get(id))
+        .filter(Boolean)
+        .map((product) => this.formatProduct(product!));
+      const pickedSet = new Set(picked.map((product) => product.id));
+      const fill = pool.filter((product) => !pickedSet.has(product.id));
+      return [...picked, ...fill].slice(0, limit);
+    }
+
+    if (mode === CategoryFeedSortMode.NEWEST) {
+      return pool.slice(0, limit);
+    }
+
+    return this.sortByDiscountPercent(pool).slice(0, limit);
   }
 
   private sortByDiscountPercent<T extends { discountPercent?: number; effectivePrice?: number }>(

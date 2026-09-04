@@ -407,10 +407,11 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
           <button
             v-if="section.tag?.slug && section.total > section.products.length"
             type="button"
-            class="text-xs text-primary-600 font-medium shrink-0"
+            class="inline-flex items-center gap-1 shrink-0 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm transition-colors hover:bg-primary-100 active:bg-primary-100/80"
             @click="selectTag(section.tag.slug)"
           >
             ادامه
+            <AppIcon name="lucide:chevron-left" size="xs" />
           </button>
         </div>
 

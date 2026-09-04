@@ -101,6 +101,28 @@ router.put(
   })
 );
 
+const categoryFeedSchema = z.object({
+  feedSortMode: z.enum(['MANUAL', 'DISCOUNT', 'NEWEST']).optional(),
+  productIds: z.array(z.string()).max(10).optional(),
+});
+
+router.get(
+  '/categories/:id/feed-picks',
+  asyncHandler(async (req, res) => {
+    const picks = await productService.getCategoryFeedPicks(paramId(req.params.id));
+    successResponse(res, picks);
+  })
+);
+
+router.put(
+  '/categories/:id/feed-picks',
+  validate(categoryFeedSchema),
+  asyncHandler(async (req, res) => {
+    const picks = await productService.setCategoryFeedPicks(paramId(req.params.id), req.body);
+    successResponse(res, picks, 'محصولات دسته ذخیره شد');
+  })
+);
+
 router.post(
   '/categories/upload',
   permCategories,

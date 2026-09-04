@@ -321,9 +321,14 @@ useHead({ title: 'محصولات - پنل مدیریت' });
   <div>
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <h1 class="text-xl font-bold text-gray-800">مدیریت محصولات</h1>
-      <NuxtLink to="/admin/home-picks" class="text-sm font-medium text-primary-600 hover:text-primary-700">
-        انتخاب محصولات صفحه اول
-      </NuxtLink>
+      <div class="flex flex-wrap gap-3 text-sm">
+        <NuxtLink to="/admin/home-picks" class="font-medium text-primary-600 hover:text-primary-700">
+          انتخاب محصولات صفحه اول
+        </NuxtLink>
+        <NuxtLink to="/admin/category-feed" class="font-medium text-primary-600 hover:text-primary-700">
+          ترتیب محصولات هر دسته
+        </NuxtLink>
+      </div>
     </div>
     <div class="flex flex-col md:flex-row gap-3 mb-4 flex-wrap">
       <input

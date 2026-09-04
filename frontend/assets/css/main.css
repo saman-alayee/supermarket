@@ -115,7 +115,8 @@
 
   .product-card-strip {
     @apply flex flex-nowrap items-stretch gap-3 overflow-x-auto overscroll-x-contain scrollbar-hide pb-2 pt-0.5 px-0.5 cursor-grab select-none;
-    direction: rtl;
+    direction: ltr;
+    flex-direction: row-reverse;
     max-width: 100%;
     min-width: 0;
     touch-action: pan-x pan-y pinch-zoom;
@@ -162,6 +163,22 @@
 
   .product-card-strip-loader-dot {
     @apply h-5 w-5 rounded-full border-2 border-primary-500 border-t-transparent animate-spin;
+  }
+
+  .product-card-strip-shell {
+    @apply relative;
+  }
+
+  .product-card-strip-nav {
+    @apply absolute top-[38%] z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-primary-700 shadow-lg transition-opacity;
+  }
+
+  .product-card-strip-nav-prev {
+    @apply end-1;
+  }
+
+  .product-card-strip-nav-next {
+    @apply start-1;
   }
 
   .chip-strip {

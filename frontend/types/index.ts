@@ -10,10 +10,13 @@ export interface Category {
   slug: string;
   image: string | null;
   sortOrder: number;
+  feedSortMode?: 'MANUAL' | 'DISCOUNT' | 'NEWEST';
   isActive: boolean;
   _count?: { products: number };
   tags?: Tag[];
 }
+
+export type CategoryFeedSortMode = 'MANUAL' | 'DISCOUNT' | 'NEWEST';
 
 export interface Tag {
   id: string;
