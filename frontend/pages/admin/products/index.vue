@@ -230,7 +230,7 @@ function openForm(product?: Product) {
       discountPrice: null,
       stock: 0,
       unit: '',
-      categoryIds: categories.value[0]?.id ? [categories.value[0].id] : [],
+      categoryIds: [],
       tagIds: [],
       image: null,
       images: [],
@@ -246,6 +246,11 @@ function openForm(product?: Product) {
 }
 
 async function save() {
+  if (!form.categoryIds.length) {
+    toast.error('حداقل یک دسته‌بندی انتخاب کنید');
+    return;
+  }
+
   const payload = {
     ...form,
     barcode: form.barcode.trim() || null,
