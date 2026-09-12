@@ -245,14 +245,46 @@ function openForm(product?: Product) {
   showForm.value = true;
 }
 
+function toOptionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function onDiscountPriceInput(event: Event) {
+  const raw = (event.target as HTMLInputElement).value.trim();
+  form.discountPrice = raw === '' ? null : Number(raw);
+}
+
 async function save() {
   if (!form.categoryIds.length) {
     toast.error('حداقل یک دسته‌بندی انتخاب کنید');
     return;
   }
 
+  const price = toOptionalNumber(form.price);
+  if (price === null || price <= 0) {
+    toast.error('قیمت باید یک عدد معتبر باشد');
+    return;
+  }
+
+  const discountPrice = toOptionalNumber(form.discountPrice);
+  if (discountPrice !== null && discountPrice <= 0) {
+    toast.error('قیمت با تخفیف باید خالی باشد یا عددی بزرگ‌تر از صفر');
+    return;
+  }
+  if (discountPrice !== null && discountPrice >= price) {
+    toast.error('قیمت با تخفیف باید کمتر از قیمت اصلی باشد');
+    return;
+  }
+
+  const stock = toOptionalNumber(form.stock) ?? 0;
+
   const payload = {
     ...form,
+    price,
+    discountPrice,
+    stock,
     barcode: form.barcode.trim() || null,
     productionDate: form.productionDate || null,
     expiryDate: form.expiryDate || null,
@@ -523,12 +555,13 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">قیمت با تخفیف</label>
               <input
-                v-model.number="form.discountPrice"
+                :value="form.discountPrice ?? ''"
                 type="number"
                 min="0"
-                placeholder="اختیاری"
+                placeholder="اختیاری — خالی = بدون تخفیف"
                 class="input-field"
                 dir="ltr"
+                @input="onDiscountPriceInput"
               />
             </div>
           </div>

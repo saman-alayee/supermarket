@@ -138,15 +138,42 @@ router.post(
 );
 
 // Products
+/** Empty string from cleared number inputs → null; numeric strings → number. */
+const optionalNullableNumber = z.preprocess((value) => {
+  if (value === '' || value === undefined) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : value;
+  }
+  return value;
+}, z.number().positive().nullable().optional());
+
+const requiredPositiveNumber = z.preprocess((value) => {
+  if (typeof value === 'string' && value.trim() !== '') {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : value;
+  }
+  return value;
+}, z.number().positive());
+
+const requiredNonNegInt = z.preprocess((value) => {
+  if (typeof value === 'string' && value.trim() !== '') {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : value;
+  }
+  return value;
+}, z.number().int().min(0));
+
 const productBaseSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
   barcode: z.string().optional().nullable(),
   productionDate: z.string().optional().nullable(),
   expiryDate: z.string().optional().nullable(),
-  price: z.number().positive(),
-  discountPrice: z.number().positive().optional().nullable(),
-  stock: z.number().int().min(0),
+  price: requiredPositiveNumber,
+  discountPrice: optionalNullableNumber,
+  stock: requiredNonNegInt,
   image: z.string().optional().nullable(),
   images: z.array(z.string()).optional(),
   unit: z.string().optional(),
