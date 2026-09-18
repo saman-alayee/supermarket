@@ -25,6 +25,7 @@ const tagFilter = ref('');
 const expiryFilter = ref<'ALL' | 'WEEK' | 'EXPIRED' | 'RANGE'>('ALL');
 const expiryFrom = ref<string | null>(null);
 const expiryTo = ref<string | null>(null);
+const sortFilter = ref<'newest' | 'discount' | 'bestsellers'>('newest');
 
 const form = reactive({
   name: '',
@@ -141,6 +142,7 @@ async function loadData() {
     if (barcodeFilter.value.trim()) params.set('barcode', barcodeFilter.value.trim());
     if (categoryFilter.value) params.set('categoryId', categoryFilter.value);
     if (tagFilter.value) params.set('tagId', tagFilter.value);
+    if (sortFilter.value && sortFilter.value !== 'newest') params.set('sort', sortFilter.value);
 
     const today = getTodayGregorianIso();
     if (expiryFilter.value === 'EXPIRED') {
@@ -401,6 +403,11 @@ useHead({ title: 'محصولات - پنل مدیریت' });
         <option value="EXPIRED">منقضی‌شده</option>
         <option value="RANGE">بازه تاریخ انقضا</option>
       </select>
+      <select v-model="sortFilter" class="input-field md:w-48" @change="resetToFirstPageAndLoad">
+        <option value="newest">جدیدترین</option>
+        <option value="discount">بیشترین تخفیف</option>
+        <option value="bestsellers">پرفروش‌ترین</option>
+      </select>
       <button class="btn-secondary text-sm" @click="resetToFirstPageAndLoad">اعمال فیلتر</button>
     </div>
 
@@ -457,9 +464,9 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             <th class="w-14">تصویر</th>
             <th>نام</th>
             <th class="hidden md:table-cell">بارکد</th>
+            <th class="whitespace-nowrap">تاریخ انقضا</th>
             <th class="hidden md:table-cell">دسته</th>
             <th>قیمت</th>
-            <th class="hidden lg:table-cell">انقضا</th>
             <th class="hidden md:table-cell">موجودی</th>
             <th>وضعیت</th>
             <th>عملیات</th>
@@ -480,10 +487,25 @@ useHead({ title: 'محصولات - پنل مدیریت' });
             </td>
             <td class="font-medium">{{ product.name }}</td>
             <td class="hidden md:table-cell text-gray-500 font-mono text-xs" dir="ltr">{{ product.barcode || '—' }}</td>
-            <td class="hidden md:table-cell text-gray-500">{{ product.category?.name }}</td>
-            <td>{{ formatPrice(product.effectivePrice) }}</td>
-            <td class="hidden lg:table-cell text-xs" :class="expiryTone(product.expiryDate)">
+            <td class="text-xs whitespace-nowrap" :class="expiryTone(product.expiryDate) || 'text-gray-400'">
               {{ product.expiryDate ? formatShortDate(product.expiryDate) : '—' }}
+            </td>
+            <td class="hidden md:table-cell text-gray-500">{{ product.category?.name }}</td>
+            <td class="whitespace-nowrap">
+              <div class="flex flex-col items-start gap-0.5">
+                <span
+                  v-if="product.discountPrice"
+                  class="text-xs text-gray-400 line-through"
+                >
+                  {{ formatPrice(product.price) }}
+                </span>
+                <span :class="product.discountPrice ? 'text-red-600 font-semibold' : ''">
+                  {{ formatPrice(product.effectivePrice) }}
+                </span>
+                <span v-if="product.discountPercent" class="text-[11px] text-red-500">
+                  {{ product.discountPercent }}٪ تخفیف
+                </span>
+              </div>
             </td>
             <td class="hidden md:table-cell">{{ product.stock }}</td>
             <td>

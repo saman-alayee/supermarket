@@ -4,6 +4,7 @@ import type { Product, Pagination } from '~/types';
 definePageMeta({ layout: 'admin', middleware: 'admin' });
 
 const HOME_PICK_LIMIT = 10;
+const SEARCH_LIMIT = 30;
 
 const api = useApi();
 const toast = useToast();
@@ -17,8 +18,10 @@ const saving = ref(false);
 const searching = ref(false);
 const search = ref('');
 const searchResults = ref<Product[]>([]);
+const searchError = ref('');
 const discounted = ref<Product[]>([]);
 const featured = ref<Product[]>([]);
+const searchFocused = ref(false);
 
 const selected = computed({
   get: () => (tab.value === 'discounted' ? discounted.value : featured.value),
@@ -37,7 +40,13 @@ const tabHint = computed(() =>
     : 'همین فهرست در زبانه «ویژه» صفحه اول فروشگاه می‌آید، با ترتیبی که این‌جا می‌چینید.'
 );
 
+const searchHint = computed(() => {
+  if (search.value.trim()) return '';
+  return 'برای دیدن پیشنهادها کلیک کنید، یا نام / بارکد محصول را بنویسید.';
+});
+
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let searchSeq = 0;
 
 onMounted(loadPicks);
 
@@ -45,12 +54,17 @@ watch(search, () => {
   if (searchTimer) clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     void runSearch();
-  }, 280);
+  }, 320);
 });
 
 watch(tab, () => {
   searchResults.value = [];
-  if (search.value.trim()) void runSearch();
+  searchError.value = '';
+  if (search.value.trim() || searchFocused.value) void runSearch();
+});
+
+onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer);
 });
 
 async function loadPicks() {
@@ -68,31 +82,64 @@ async function loadPicks() {
   }
 }
 
+function rankForTab(products: Product[]) {
+  const list = products.filter((product) => product.isActive && !selectedIds.value.has(product.id));
+  if (tab.value !== 'discounted') return list;
+  return [...list].sort((a, b) => {
+    const aDisc = a.discountPrice != null ? 1 : 0;
+    const bDisc = b.discountPrice != null ? 1 : 0;
+    if (bDisc !== aDisc) return bDisc - aDisc;
+    return (b.discountPercent ?? 0) - (a.discountPercent ?? 0);
+  });
+}
+
 async function runSearch() {
   const term = search.value.trim();
-  if (term.length < 1) {
-    searchResults.value = [];
-    return;
-  }
+  const seq = ++searchSeq;
   searching.value = true;
+  searchError.value = '';
+
   try {
     const params = new URLSearchParams({
-      search: term,
-      limit: '20',
+      limit: String(SEARCH_LIMIT),
       page: '1',
     });
+    if (term) params.set('search', term);
+
     const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
       `/admin/products?${params}`
     );
-    searchResults.value = data.products.filter((product) => !selectedIds.value.has(product.id));
+
+    if (seq !== searchSeq) return;
+
+    searchResults.value = rankForTab(data.products ?? []);
   } catch (e: unknown) {
-    toast.error(e instanceof Error ? e.message : 'خطا در جستجو');
+    if (seq !== searchSeq) return;
+    searchResults.value = [];
+    searchError.value = e instanceof Error ? e.message : 'خطا در جستجو';
+    toast.error(searchError.value);
   } finally {
-    searching.value = false;
+    if (seq === searchSeq) searching.value = false;
   }
 }
 
+function onSearchFocus() {
+  searchFocused.value = true;
+  if (!searchResults.value.length) void runSearch();
+}
+
+function clearSearch() {
+  search.value = '';
+  searchResults.value = [];
+  searchError.value = '';
+  if (searchFocused.value) void runSearch();
+}
+
 function addProduct(product: Product) {
+  if (!product.isActive) {
+    toast.error('محصول غیرفعال را نمی‌توان به صفحه اول اضافه کرد');
+    return;
+  }
   if (selectedIds.value.has(product.id)) return;
   if (selected.value.length >= HOME_PICK_LIMIT) {
     toast.error(`حداکثر ${HOME_PICK_LIMIT} محصول می‌توانید انتخاب کنید`);
@@ -104,6 +151,7 @@ function addProduct(product: Product) {
 
 function removeProduct(id: string) {
   selected.value = selected.value.filter((item) => item.id !== id);
+  if (searchFocused.value || search.value.trim()) void runSearch();
 }
 
 function moveProduct(index: number, direction: -1 | 1) {
@@ -187,14 +235,31 @@ useHead({ title: 'محصولات صفحه اول - پنل مدیریت' });
         <p class="text-xs text-gray-500 mb-3">
           {{ remaining ? `${remaining} جای خالی مانده` : 'ظرفیت این فهرست پر است' }}
         </p>
-        <input
-          v-model="search"
-          type="search"
-          class="input-field mb-3"
-          placeholder="نام، بارکد یا دسته را بنویسید..."
-        />
+        <div class="relative mb-2">
+          <input
+            v-model="search"
+            type="search"
+            class="input-field pe-10"
+            placeholder="نام محصول، بارکد یا بخشی از نام…"
+            autocomplete="off"
+            @focus="onSearchFocus"
+          />
+          <button
+            v-if="search"
+            type="button"
+            class="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-sm px-1"
+            aria-label="پاک کردن جستجو"
+            @click="clearSearch"
+          >
+            ✕
+          </button>
+        </div>
+        <p v-if="searchHint" class="text-xs text-gray-400 mb-3">{{ searchHint }}</p>
         <LoadingSpinner :show="searching" />
-        <ul v-if="!searching && searchResults.length" class="divide-y divide-gray-100">
+        <ul
+          v-if="!searching && searchResults.length"
+          class="divide-y divide-gray-100 max-h-[28rem] overflow-y-auto"
+        >
           <li
             v-for="product in searchResults"
             :key="product.id"
@@ -208,6 +273,7 @@ useHead({ title: 'محصولات صفحه اول - پنل مدیریت' });
             <div class="min-w-0 flex-1">
               <p class="text-sm font-medium text-gray-800 truncate">{{ product.name }}</p>
               <p class="text-xs text-gray-500">
+                <span v-if="product.category?.name">{{ product.category.name }} · </span>
                 {{ formatPrice(product.effectivePrice) }}
                 <span v-if="product.discountPercent" class="text-red-500 ms-1">
                   {{ product.discountPercent }}٪
@@ -224,8 +290,11 @@ useHead({ title: 'محصولات صفحه اول - پنل مدیریت' });
             </button>
           </li>
         </ul>
-        <p v-else-if="!searching && search.trim()" class="text-sm text-gray-400 py-4">
-          محصولی پیدا نشد.
+        <p
+          v-else-if="!searching && (search.trim() || searchFocused) && !searchError"
+          class="text-sm text-gray-400 py-4"
+        >
+          {{ search.trim() ? 'محصولی با این عبارت پیدا نشد. املا یا کلمهٔ کوتاه‌تری امتحان کنید.' : 'محصول فعالی برای پیشنهاد نیست.' }}
         </p>
       </section>
 

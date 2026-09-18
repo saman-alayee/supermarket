@@ -3,11 +3,15 @@ import type { Product, Pagination } from '~/types';
 import { SITE_NAME } from '~/constants/site';
 
 const route = useRoute();
+const router = useRouter();
 const api = useApi();
 
 const PAGE_SIZE = 24;
 
+type SortMode = 'newest' | 'discount' | 'bestsellers';
+
 const query = ref('');
+const sort = ref<SortMode>('newest');
 const products = ref<Product[]>([]);
 const pagination = ref<Pagination | null>(null);
 const loading = ref(false);
@@ -19,10 +23,49 @@ const hasMore = computed(() => {
   return !!p && p.page < p.totalPages;
 });
 
+const sortOptions: { value: SortMode; label: string }[] = [
+  { value: 'newest', label: 'جدیدترین' },
+  { value: 'discount', label: 'بیشترین تخفیف' },
+  { value: 'bestsellers', label: 'پرفروش' },
+];
+
+const isBrowseMode = computed(
+  () =>
+    route.query.discounted === '1' ||
+    route.query.featured === '1' ||
+    route.query.sort === 'discount' ||
+    route.query.sort === 'bestsellers' ||
+    Boolean(route.query.q)
+);
+
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function syncFromRoute() {
   query.value = (route.query.q as string) || '';
+  const routeSort = route.query.sort as string;
+  if (routeSort === 'discount' || routeSort === 'bestsellers') {
+    sort.value = routeSort;
+  } else if (route.query.discounted === '1') {
+    sort.value = 'discount';
+  } else {
+    sort.value = 'newest';
+  }
+}
+
+function buildQuery(overrides: Record<string, string | undefined> = {}) {
+  const next: Record<string, string> = {};
+  const q = overrides.q !== undefined ? overrides.q : query.value.trim();
+  const nextSort = (overrides.sort as SortMode | undefined) ?? sort.value;
+
+  if (route.query.featured === '1' && overrides.featured !== '0') {
+    next.featured = '1';
+  }
+  if (route.query.discounted === '1' && overrides.discounted !== '0' && nextSort === 'discount') {
+    next.discounted = '1';
+  }
+  if (q) next.q = q;
+  if (nextSort && nextSort !== 'newest') next.sort = nextSort;
+  return next;
 }
 
 async function fetchProducts(page: number, append: boolean) {
@@ -31,36 +74,30 @@ async function fetchProducts(page: number, append: boolean) {
     page: String(page),
   });
 
-  if (route.query.discounted === '1') {
-    pageTitle.value = 'محصولات تخفیف‌دار';
-    params.set('discounted', 'true');
-    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-      `/products?${params}`
-    );
-    products.value = append ? [...products.value, ...data.products] : data.products;
-    pagination.value = data.pagination;
-    return;
-  }
-  if (route.query.featured === '1') {
+  if (sort.value !== 'newest') params.set('sort', sort.value);
+
+  if (route.query.discounted === '1' || sort.value === 'discount') {
+    pageTitle.value = sort.value === 'bestsellers' ? 'پرفروش‌ترین‌ها' : 'بیشترین تخفیف';
+    if (route.query.discounted === '1') params.set('discounted', 'true');
+  } else if (route.query.featured === '1') {
     pageTitle.value = 'محصولات ویژه';
     params.set('featured', 'true');
-    const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
-      `/products?${params}`
-    );
-    products.value = append ? [...products.value, ...data.products] : data.products;
-    pagination.value = data.pagination;
-    return;
+  } else if (sort.value === 'bestsellers') {
+    pageTitle.value = 'پرفروش‌ترین‌ها';
+  } else {
+    pageTitle.value = query.value.trim() ? 'جستجو' : 'محصولات';
   }
 
-  pageTitle.value = 'جستجو';
   const term = query.value.trim();
-  if (!term) {
+  if (!route.query.discounted && !route.query.featured && sort.value === 'newest' && !term) {
     products.value = [];
     pagination.value = null;
     return;
   }
 
-  params.set('search', term);
+  // Browse bestsellers/discount without requiring a search term
+  if (term) params.set('search', term);
+
   const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
     `/products?${params}`
   );
@@ -97,18 +134,19 @@ const { sentinel: loadMoreSentinel } = useInfiniteScroll(loadMore);
 function onQueryInput() {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    navigateTo(
-      {
-        path: '/search',
-        query: query.value.trim() ? { q: query.value.trim() } : {},
-      },
-      { replace: true }
-    );
+    void router.replace({ path: '/search', query: buildQuery({ q: query.value.trim() || undefined }) });
   }, 350);
 }
 
+function setSort(next: SortMode) {
+  sort.value = next;
+  const overrides: Record<string, string | undefined> = { sort: next };
+  if (next !== 'discount') overrides.discounted = '0';
+  void router.replace({ path: '/search', query: buildQuery(overrides) });
+}
+
 watch(
-  () => [route.query.q, route.query.discounted, route.query.featured],
+  () => [route.query.q, route.query.discounted, route.query.featured, route.query.sort],
   () => {
     syncFromRoute();
     void loadSearch();
@@ -125,7 +163,7 @@ useHead(() => ({
   <div class="px-4 py-4">
     <h1 class="section-title">{{ pageTitle }}</h1>
 
-    <form v-if="!route.query.discounted && !route.query.featured" class="mb-5" @submit.prevent="loadSearch">
+    <form class="mb-4" @submit.prevent="loadSearch">
       <div class="relative">
         <input
           v-model="query"
@@ -140,6 +178,23 @@ useHead(() => ({
       </div>
     </form>
 
+    <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1">
+      <button
+        v-for="option in sortOptions"
+        :key="option.value"
+        type="button"
+        :class="[
+          'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-colors',
+          sort === option.value
+            ? 'bg-primary-600 text-white border-primary-600'
+            : 'bg-white text-gray-600 border-gray-200',
+        ]"
+        @click="setSort(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+
     <LoadingSpinner :show="loading" />
 
     <ProductCardList v-if="!loading" :products="products" />
@@ -153,6 +208,9 @@ useHead(() => ({
       <p v-if="loadingMore" class="text-xs text-gray-400">در حال بارگذاری محصولات بیشتر…</p>
     </div>
 
-    <EmptyState v-if="!loading && !products.length" message="محصولی یافت نشد" />
+    <EmptyState
+      v-if="!loading && !products.length"
+      :message="isBrowseMode ? 'محصولی یافت نشد' : 'عبارت جستجو را بنویسید یا فیلتر تخفیف / پرفروش را بزنید'"
+    />
   </div>
 </template>

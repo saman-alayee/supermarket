@@ -35,6 +35,7 @@ router.get(
       homeDeal,
       homeFeatured,
       isNew,
+      sort,
       page,
       limit,
     } = req.query;
@@ -55,6 +56,7 @@ router.get(
       homeDeal: homeDeal === 'true',
       homeFeatured: homeFeatured === 'true',
       isNew: isNew === 'true',
+      sort: sort as string,
       page: page ? parseInt(page as string) : 1,
       limit: Math.min(parsedLimit, idList?.length ? 100 : 50),
     });

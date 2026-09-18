@@ -208,6 +208,8 @@ router.get(
       categoryId: req.query.categoryId as string,
       expiringBefore: req.query.expiringBefore as string,
       expiringAfter: req.query.expiringAfter as string,
+      discounted: req.query.discounted === 'true',
+      sort: req.query.sort as string,
       page: req.query.page ? parseInt(req.query.page as string) : 1,
       limit: Math.min(req.query.limit ? parseInt(req.query.limit as string) : 20, 50),
     });

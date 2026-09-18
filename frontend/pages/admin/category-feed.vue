@@ -35,6 +35,7 @@ const sortModeHint = computed(() => {
 });
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let searchSeq = 0;
 
 onMounted(async () => {
   loadingCategories.value = true;
@@ -88,22 +89,27 @@ async function runSearch() {
     searchResults.value = [];
     return;
   }
+  const seq = ++searchSeq;
   searching.value = true;
   try {
     const params = new URLSearchParams({
       search: term,
       categoryId: categoryId.value,
-      limit: '20',
+      limit: '30',
       page: '1',
     });
     const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
       `/admin/products?${params}`
     );
-    searchResults.value = data.products.filter((product) => !selectedIds.value.has(product.id));
+    if (seq !== searchSeq) return;
+    searchResults.value = (data.products ?? []).filter(
+      (product) => product.isActive && !selectedIds.value.has(product.id)
+    );
   } catch (e: unknown) {
+    if (seq !== searchSeq) return;
     toast.error(e instanceof Error ? e.message : 'خطا در جستجو');
   } finally {
-    searching.value = false;
+    if (seq === searchSeq) searching.value = false;
   }
 }
 

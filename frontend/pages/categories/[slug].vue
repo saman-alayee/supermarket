@@ -9,6 +9,18 @@ const slug = computed(() => route.params.slug as string);
 const PAGE_SIZE = 24;
 const STRIP_CHUNK = 8;
 const selectedTag = ref<string>((route.query.tag as string) || 'all');
+type SortMode = 'newest' | 'discount' | 'bestsellers';
+const sort = ref<SortMode>(
+  route.query.sort === 'discount' || route.query.sort === 'bestsellers'
+    ? (route.query.sort as SortMode)
+    : 'newest'
+);
+
+const sortOptions: { value: SortMode; label: string }[] = [
+  { value: 'newest', label: 'جدیدترین' },
+  { value: 'discount', label: 'بیشترین تخفیف' },
+  { value: 'bestsellers', label: 'پرفروش' },
+];
 
 const { data: category } = await useAsyncData(
   () => `category-${slug.value}`,
@@ -112,6 +124,7 @@ async function loadMoreForSection(tagSlug: string) {
       limit: String(STRIP_CHUNK),
       page: String(nextPage),
     });
+    if (sort.value !== 'newest') params.set('sort', sort.value);
 
     if (tag && tagSlug !== 'other') {
       params.set('tagId', tag.id);
@@ -179,6 +192,7 @@ async function loadFallbackPage(nextPage: number, append = false) {
     limit: String(PAGE_SIZE),
     page: String(nextPage),
   });
+  if (sort.value !== 'newest') params.set('sort', sort.value);
   const { data } = await api.get<{ products: Product[]; pagination: Pagination }>(
     `/products?${params}`
   );
@@ -221,6 +235,7 @@ async function loadTagProducts(tagSlug: string, nextPage = 1, append = false) {
     limit: String(PAGE_SIZE),
     page: String(nextPage),
   });
+  if (sort.value !== 'newest') params.set('sort', sort.value);
 
   if (tag && tagSlug !== 'other') {
     params.set('tagId', tag.id);
@@ -246,6 +261,10 @@ async function loadPageData() {
     await loadGrouped();
     if (selectedTag.value !== 'all') {
       await loadTagProducts(selectedTag.value, 1);
+    } else if (sort.value !== 'newest' && grouped.value.length) {
+      await reloadAllSections();
+    } else if (sort.value !== 'newest' && !grouped.value.length) {
+      await loadFallbackPage(1);
     }
   } finally {
     loading.value = false;
@@ -260,15 +279,68 @@ function selectTag(tagSlug: string) {
   navigateTo(
     {
       path: route.path,
-      query: tagSlug === 'all' ? {} : { tag: tagSlug },
+      query: {
+        ...(tagSlug === 'all' ? {} : { tag: tagSlug }),
+        ...(sort.value !== 'newest' ? { sort: sort.value } : {}),
+      },
     },
     { replace: true }
   );
   if (tagSlug === 'all') {
-    syncSectionStates();
+    if (sort.value !== 'newest' && grouped.value.length) {
+      void reloadAllSections();
+    } else if (sort.value !== 'newest') {
+      void loadFallbackPage(1);
+    } else {
+      syncSectionStates();
+    }
     return;
   }
   void loadTagProducts(tagSlug, 1);
+}
+
+function setSort(next: SortMode) {
+  if (sort.value === next) return;
+  sort.value = next;
+  tagProducts.value = [];
+  fallbackProducts.value = [];
+  listPagination.value = null;
+  navigateTo(
+    {
+      path: route.path,
+      query: {
+        ...(selectedTag.value === 'all' ? {} : { tag: selectedTag.value }),
+        ...(next !== 'newest' ? { sort: next } : {}),
+      },
+    },
+    { replace: true }
+  );
+  if (selectedTag.value === 'all') {
+    if (!grouped.value.length) {
+      void loadFallbackPage(1);
+    } else {
+      // Re-fetch overview strips with new sort via section reload
+      void reloadAllSections();
+    }
+    return;
+  }
+  void loadTagProducts(selectedTag.value, 1);
+}
+
+async function reloadAllSections() {
+  for (const section of grouped.value) {
+    const key = section.tag.slug;
+    sectionStates.value = {
+      ...sectionStates.value,
+      [key]: {
+        products: [],
+        page: 0,
+        total: section.total,
+        loading: false,
+      },
+    };
+    await loadMoreForSection(key);
+  }
 }
 
 async function loadMore() {
@@ -389,6 +461,23 @@ useHead({ title: `${category.value?.name || 'دسته‌بندی'} - ${SITE_NAME
           سایر
         </button>
       </ChipStrip>
+
+      <div class="flex gap-2 overflow-x-auto scrollbar-hide pt-2">
+        <button
+          v-for="option in sortOptions"
+          :key="option.value"
+          type="button"
+          :class="[
+            'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors',
+            sort === option.value
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'bg-white text-gray-600 border-gray-200',
+          ]"
+          @click="setSort(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
     </div>
 
     <LoadingSpinner :show="loading" />

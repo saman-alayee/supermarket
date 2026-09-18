@@ -3,6 +3,7 @@ import { Prisma, CategoryFeedSortMode } from '@prisma/client';
 import { cacheGet, cacheSet, cacheDel } from '../config/redis';
 import { AppError } from '../utils/errors';
 import { slugify } from '../utils/helpers';
+import { searchTermVariants } from '../utils/normalize';
 
 interface ProductFilters {
   categoryId?: string;
@@ -18,6 +19,8 @@ interface ProductFilters {
   homeDeal?: boolean;
   homeFeatured?: boolean;
   isNew?: boolean;
+  /** newest | discount | bestsellers */
+  sort?: string;
   page?: number;
   limit?: number;
   includeInactive?: boolean;
@@ -57,6 +60,36 @@ function textContains(value: string) {
   return { contains: value };
 }
 
+function buildSearchClause(search: string) {
+  const terms = search
+    .trim()
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 1);
+
+  if (!terms.length) return null;
+
+  // Every word must match somewhere (AND of ORs). Previously all words were OR'd
+  // together, so "ماست میهن" returned almost anything containing either word.
+  return {
+    AND: terms.map((term) => {
+      const variants = searchTermVariants(term);
+      return {
+        OR: variants.flatMap((variant) => [
+          { name: textContains(variant) },
+          { description: textContains(variant) },
+          { slug: textContains(variant) },
+          { barcode: textContains(variant) },
+          { category: { name: textContains(variant) } },
+          { tag: { name: textContains(variant) } },
+          { productCategories: { some: { category: { name: textContains(variant) } } } },
+          { productTags: { some: { tag: { name: textContains(variant) } } } },
+        ]),
+      };
+    }),
+  };
+}
+
 function normalizeImages(images?: string[], image?: string | null): string[] {
   const list = (images?.length ? images : image ? [image] : [])
     .map((url) => url.trim())
@@ -80,6 +113,7 @@ export class ProductService {
       homeDeal,
       homeFeatured,
       isNew,
+      sort,
       page = 1,
       limit = 20,
       includeInactive = false,
@@ -91,7 +125,6 @@ export class ProductService {
     if (!includeInactive) where.isActive = true;
     if (categoryId) andFilters.push(categoryFilter(categoryId));
     if (tagId) andFilters.push(tagFilter(tagId));
-    if (andFilters.length) where.AND = andFilters;
     if (ids?.length) where.id = { in: ids };
     if (categorySlug) {
       andFilters.push({
@@ -100,7 +133,6 @@ export class ProductService {
           { productCategories: { some: { category: { slug: categorySlug } } } },
         ],
       });
-      where.AND = andFilters;
     }
     if (featured) where.isFeatured = true;
     if (isNew) where.isNew = true;
@@ -108,7 +140,10 @@ export class ProductService {
     if (homeDeal) where.isHomeDeal = true;
     if (homeFeatured) where.isHomeFeatured = true;
     if (barcode?.trim()) {
-      where.barcode = textContains(barcode.trim());
+      const barcodeVariants = searchTermVariants(barcode.trim());
+      andFilters.push({
+        OR: barcodeVariants.map((variant) => ({ barcode: textContains(variant) })),
+      });
     }
     if (expiringBefore || expiringAfter) {
       where.expiryDate = {
@@ -117,30 +152,36 @@ export class ProductService {
       };
     }
     if (search) {
-      const terms = search
-        .trim()
-        .split(/\s+/)
-        .map((term) => term.trim())
-        .filter((term) => term.length >= 1);
-      if (terms.length) {
-        where.OR = terms.flatMap((term) => [
-          { name: textContains(term) },
-          { description: textContains(term) },
-          { slug: textContains(term) },
-          { barcode: textContains(term) },
-          { category: { name: textContains(term) } },
-          { tag: { name: textContains(term) } },
-          { productCategories: { some: { category: { name: textContains(term) } } } },
-          { productTags: { some: { tag: { name: textContains(term) } } } },
-        ]);
-      }
+      const searchClause = buildSearchClause(search);
+      if (searchClause) andFilters.push(searchClause);
+    }
+    if (andFilters.length) where.AND = andFilters;
+
+    const sortMode = this.normalizeSort(sort);
+    const skipCache = Boolean(search || includeInactive || barcode || sortMode !== 'newest');
+    const cacheKey = `products:${JSON.stringify(filters)}`;
+    if (!skipCache) {
+      const cached = await cacheGet<unknown>(cacheKey);
+      if (cached) return cached;
     }
 
-    const cacheKey = `products:${JSON.stringify(filters)}`;
-    const cached = await cacheGet<unknown>(cacheKey);
-    if (cached) return cached;
-
     const curatedList = Boolean(homeDeal || homeFeatured || featured);
+    const needsCustomSort = sortMode === 'discount' || sortMode === 'bestsellers';
+
+    if (needsCustomSort) {
+      const allProducts = await prisma.product.findMany({
+        where,
+        include: productInclude,
+      });
+      const ordered = await this.applyCustomSort(allProducts, sortMode);
+      const total = ordered.length;
+      const pageItems = ordered.slice((page - 1) * limit, page * limit);
+      return {
+        products: pageItems.map((product) => this.formatProduct(product)),
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
+      };
+    }
+
     const orderBy = homeDeal
       ? [{ homeDealSort: 'asc' as const }, { createdAt: 'desc' as const }]
       : homeFeatured
@@ -161,13 +202,58 @@ export class ProductService {
     ]);
 
     const formatted = products.map((product) => this.formatProduct(product));
+    // Keep DB order for search/curated lists; discount-sort only for casual browsing.
     const result = {
-      products: curatedList ? formatted : this.sortByDiscountPercent(formatted),
+      products: curatedList || search ? formatted : this.sortByDiscountPercent(formatted),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
 
-    await cacheSet(cacheKey, result, 300);
+    if (!skipCache) {
+      await cacheSet(cacheKey, result, 300);
+    }
     return result;
+  }
+
+  private normalizeSort(sort?: string): 'newest' | 'discount' | 'bestsellers' {
+    if (sort === 'discount' || sort === 'bestsellers') return sort;
+    return 'newest';
+  }
+
+  private async applyCustomSort<T extends { id: string; price: unknown; discountPrice: unknown | null; createdAt: Date }>(
+    products: T[],
+    sortMode: 'discount' | 'bestsellers'
+  ): Promise<T[]> {
+    if (sortMode === 'discount') {
+      return [...products].sort((a, b) => {
+        const aPct = this.rawDiscountPercent(a.price, a.discountPrice);
+        const bPct = this.rawDiscountPercent(b.price, b.discountPrice);
+        if (bPct !== aPct) return bPct - aPct;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+    }
+
+    const sales = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: products.map((product) => product.id) },
+        order: { status: { notIn: ['CANCELLED'] } },
+      },
+      _sum: { quantity: true },
+    });
+    const soldById = new Map(sales.map((row) => [row.productId, row._sum.quantity ?? 0]));
+
+    return [...products].sort((a, b) => {
+      const soldDiff = (soldById.get(b.id) ?? 0) - (soldById.get(a.id) ?? 0);
+      if (soldDiff !== 0) return soldDiff;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+  }
+
+  private rawDiscountPercent(price: unknown, discountPrice: unknown | null) {
+    const p = Number(price);
+    const d = discountPrice != null ? Number(discountPrice) : null;
+    if (!d || !p || d >= p) return 0;
+    return Math.round(((p - d) / p) * 100);
   }
 
   async getBySlug(slug: string) {

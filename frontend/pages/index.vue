@@ -143,11 +143,18 @@ useHead({ title: `${SITE_NAME} - فروشگاه اینترنتی` });
     <section class="px-4 pt-3 pb-1">
       <ChipStrip>
         <NuxtLink
-          to="/search?discounted=1"
+          to="/search?sort=discount"
           class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-50 text-red-700 text-xs font-semibold border border-red-100"
         >
           <AppIcon name="lucide:percent" size="sm" />
-          تخفیف‌دار
+          بیشترین تخفیف
+        </NuxtLink>
+        <NuxtLink
+          to="/search?sort=bestsellers"
+          class="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-amber-50 text-amber-800 text-xs font-semibold border border-amber-100"
+        >
+          <AppIcon name="lucide:trophy" size="sm" />
+          پرفروش
         </NuxtLink>
         <NuxtLink
           to="/search?featured=1"
