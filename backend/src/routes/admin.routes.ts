@@ -16,7 +16,9 @@ import { upload } from '../middleware/upload';
 import { paramId } from '../utils/params';
 import { accessRoleService } from '../services/access-role.service';
 import { settingsService } from '../services/settings.service';
+import { backupService } from '../services/backup.service';
 import { PANEL_PERMISSIONS } from '../utils/permissions';
+import { AppError } from '../utils/errors';
 
 const router = Router();
 
@@ -910,6 +912,20 @@ router.post(
       ? 'پیامک تست در حالت توسعه شبیه‌سازی شد (FarazSMS پیکربندی نشده)'
       : 'پیامک تست ارسال شد';
     successResponse(res, result, message);
+  })
+);
+
+/** Full database dump (gzip). Main ADMIN only. */
+router.get(
+  '/backup/database',
+  adminOnly,
+  asyncHandler(async (_req, res) => {
+    try {
+      await backupService.streamDatabaseBackup(res);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(500, error instanceof Error ? error.message : 'خطا در بکاپ دیتابیس');
+    }
   })
 );
 

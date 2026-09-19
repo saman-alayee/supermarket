@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
 const authStore = useAuthStore();
-const { navVisible, roleLabel, canAccessPath, role } = useAdminAccess();
+const { navVisible, roleLabel, canAccessPath, role, isFullAdmin } = useAdminAccess();
 const {
   enabled: alarmEnabled,
   pendingCount,
@@ -26,11 +26,17 @@ const allNavItems = [
   { to: '/admin/customers', label: 'مشتریان', icon: 'lucide:user-round' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران', icon: 'lucide:users' },
+  { to: '/admin/backup', label: 'بکاپ دیتابیس', icon: 'lucide:database' },
   { to: '/admin/settings', label: 'تنظیمات', icon: 'lucide:settings' },
   { to: '/admin/content', label: 'قوانین و مقررات', icon: 'lucide:file-text' },
 ];
 
-const navItems = computed(() => allNavItems.filter((item) => navVisible(item.to)));
+const navItems = computed(() =>
+  allNavItems.filter((item) => {
+    if (item.to === '/admin/backup') return isFullAdmin.value;
+    return navVisible(item.to);
+  })
+);
 
 function onAlarmToggle() {
   unlockAudio();

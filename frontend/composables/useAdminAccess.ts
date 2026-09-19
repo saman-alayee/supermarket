@@ -9,6 +9,7 @@ export { ROLE_LABELS, BUILTIN_ROLE_GUIDE };
 const PATH_PERMISSIONS: Array<{ prefix: string; permission: PanelPermission }> = [
   { prefix: '/admin/users', permission: 'users' },
   { prefix: '/admin/settings', permission: 'settings' },
+  { prefix: '/admin/backup', permission: 'settings' },
   { prefix: '/admin/sales', permission: 'sales' },
   { prefix: '/admin/customers', permission: 'customers' },
   { prefix: '/admin/coupons', permission: 'coupons' },
@@ -66,6 +67,9 @@ export function useAdminAccess() {
 
   function canAccessPath(path: string): boolean {
     if (!isPanelUser.value) return false;
+    if (path === '/admin/backup' || path.startsWith('/admin/backup/')) {
+      return role.value === 'ADMIN';
+    }
     const match = PATH_PERMISSIONS.find(
       (item) => path === item.prefix || path.startsWith(`${item.prefix}/`)
     );

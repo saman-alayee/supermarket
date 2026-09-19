@@ -21,7 +21,7 @@ onMounted(async () => {
   stats.value = data;
 });
 
-const { navVisible } = useAdminAccess();
+const { navVisible, isFullAdmin } = useAdminAccess();
 
 const quickLinks = [
   { to: '/admin/orders?status=NEW', label: 'سفارش‌های جدید', desc: 'بررسی و تأیید', icon: 'lucide:inbox' },
@@ -32,11 +32,16 @@ const quickLinks = [
   { to: '/admin/sales', label: 'گزارش فروش', desc: 'بازه تاریخ و کالا', icon: 'lucide:bar-chart-3' },
   { to: '/admin/coupons', label: 'کدهای تخفیف', desc: 'مدیریت پرومو', icon: 'lucide:ticket-percent' },
   { to: '/admin/users', label: 'کاربران و دسترسی', desc: 'مدیر، مسئول، پرسنل', icon: 'lucide:users' },
+  { to: '/admin/backup', label: 'بکاپ دیتابیس', desc: 'دانلود نسخه فشرده دیتابیس', icon: 'lucide:database' },
   { to: '/admin/content', label: 'قوانین و مقررات', desc: 'ویرایش متن قوانین سایت', icon: 'lucide:file-text' },
 ];
 
 const visibleLinks = computed(() =>
-  quickLinks.filter((link) => navVisible(link.to.split('?')[0]))
+  quickLinks.filter((link) => {
+    const path = link.to.split('?')[0];
+    if (path === '/admin/backup') return isFullAdmin.value;
+    return navVisible(path);
+  })
 );
 
 useHead({ title: 'داشبورد - پنل مدیریت' });
